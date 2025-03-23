@@ -4,6 +4,7 @@
             [baymax.source.proto :as source]
             [baymax.publisher.proto :as publisher]
             [baymax.chip :as cp]
+            [baymax.registry :as registry]
             [baymax.config :as config])
   (:import [java.util.concurrent TimeUnit]
            [java.time Instant ZonedDateTime ZoneId]
@@ -31,6 +32,9 @@
 
           (log/info "collected intel for" collector-id
                     "in" duration "ms")
+
+          ;; record intel to registry
+          (registry/record-intel! collector-id intel)
 
           ;; publish intel to all associated publishers
           (doseq [pub publishers]

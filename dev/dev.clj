@@ -8,5 +8,6 @@
             [yang.lang :as y]
             [baymax.config :as c]
             [baymax.chip :as chip]
+            [baymax.registry :as registry]
             [baymax.scheduler :as scheduler]
             [baymax.source.postgres :as pg]))

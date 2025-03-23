@@ -1,0 +1,878 @@
+<file>./deps.edn</file>
+<content>
+{:paths ["src"]
+
+ :deps {tolitius/yang {:mvn/version "0.1.50"}
+        org.babashka/sci {:mvn/version "0.9.45"}
+        cprop/cprop {:mvn/version "0.1.20"}
+        seancorfield/next.jdbc {:mvn/version "1.2.659"}
+        org.postgresql/postgresql {:mvn/version "42.7.5"}
+        hikari-cp/hikari-cp {:mvn/version "3.2.0"}
+        clj-http/clj-http {:mvn/version "3.13.0"}
+        metosin/jsonista {:mvn/version "0.3.13"}
+        camel-snake-kebab/camel-snake-kebab {:mvn/version "0.4.3"}
+        org.clojure/tools.logging {:mvn/version "1.1.0"}
+        ch.qos.logback/logback-classic {:mvn/version "1.5.18"}
+
+        metosin/reitit {:mvn/version "0.7.2"}
+        ring/ring-jetty-adapter {:mvn/version "1.13.1"}
+        ring/ring-core {:mvn/version "1.13.1"}
+        }
+
+ :aliases {:dev {:extra-paths ["dev" "dev/resources"]
+                 :extra-deps {
+                              io.prometheus/simpleclient {:mvn/version "0.16.0"}
+                              io.prometheus/simpleclient_hotspot {:mvn/version "0.16.0"}
+                              io.prometheus/simpleclient_httpserver {:mvn/version "0.16.0"}
+
+                              }}
+           :repl {:extra-paths ["test" "test/resources"]
+                  :extra-deps {nrepl/nrepl {:mvn/version "0.7.0"}
+                               cider/cider-nrepl {:mvn/version "0.22.4"}
+                               com.bhauman/rebel-readline {:mvn/version "0.1.4"}}
+                  :main-opts ["-e" "(require 'dev)(in-ns 'dev)"
+                              "-m" "nrepl.cmdline" "--middleware" "[cider.nrepl/cider-middleware]"
+                              "-i" "-f" "rebel-readline.main/-main"]}
+           :test {:extra-paths ["test" "test/resources"]
+                  :extra-deps {io.github.cognitect-labs/test-runner {:git/url "https://github.com/cognitect-labs/test-runner.git"
+                                                                     :sha "e7660458ce25bc4acb4ccc3e2415aae0a4907198"}}
+                  :main-opts ["-m" "cognitect.test-runner"]
+                  :exec-fn cognitect.test-runner.api/test}
+           :outdated {:extra-deps {olical/depot {:mvn/version "2.0.1"}}
+                      :main-opts  ["-m" "depot.outdated.main" "-a" "outdated"]}
+           :tag {:extra-deps {tolitius/tag {:mvn/version "0.1.15-SNAPSHOT"}}
+                 :main-opts ["-m" "tag.core" "tolitius/baymax" "baymax: your visibility and insights loyal companion"]}
+           :jar {:extra-deps {seancorfield/depstar {:mvn/version "1.1.128"}}
+                 :extra-paths ["target/about"]
+                 :main-opts ["-m" "hf.depstar.jar" "target/baymax.jar" "--exclude" "clojure/core/specs/alpha.*"]}
+           :deploy {:extra-deps {deps-deploy/deps-deploy {:mvn/version "RELEASE"}}
+                    :main-opts ["-m" "deps-deploy.deps-deploy" "deploy" "target/baymax.jar"]}
+           :install {:extra-deps {deps-deploy/deps-deploy {:mvn/version "RELEASE"}}
+                     :main-opts ["-m" "deps-deploy.deps-deploy" "install" "target/baymax.jar"]}}}
+
+</content>
+
+<file>./dev/config.edn</file>
+<content>
+{:sources
+ {:main-db
+  {:type :postgres
+   :connection {:host "dev.rds.multipass.comcast.com"
+                :port 5432
+                :database "multipass"
+                :user "financier"
+                :password "eMEg8DdfgvcIYJLP"}
+   :pool {:maximum-pool-size 10
+          :minimum-idle 2}
+   :trusted true}}
+
+ :collectors
+ [
+  {:id "invoice-counts"
+   :source :main-db
+   :schedule "1m"
+   :query "select i.status, i.cifa_status, count(*)
+           from financier.invoice i
+           where i.cifa_status in ('P2 HOLD VALIDATED', 'HOLD VALIDATED', 'P2 HOLD NOT VALIDATED')
+             and i.status in ('Approved', 'Rejected')
+           group by i.status, i.cifa_status;"
+   :transform "(fn [rows]
+                 (mapv (fn [{:keys [status cifa-status count]}]
+                         (let [status (clojure.string/lower-case status)
+                               cifa-status (-> cifa-status clojure.string/lower-case (clojure.string/replace #\" \" \"_\"))]
+                           {:name (str \"status.\" status \".\" cifa-status)
+                            :value count
+                            :labels {:status status
+                                     :cifa-status cifa-status
+                                     :app \"financier\"}}))
+                       rows))"}]
+
+
+ :publishers
+ [
+  {:type :prometheus
+   :port 9090
+   :endpoint "/metrics"
+   :collectors ["invoice-counts"]}
+
+  {:type :stdout
+   :pretty-print true
+   :collectors ["invoice-counts"]}
+  ]
+
+ :scheduler
+ {:default-interval "1m"
+  :thread-pool-size 5}
+
+ :web
+ {:port 4242
+  :auth {:user "admin"
+         :password "foobar"}}
+
+ :logging
+ {:level :info
+  :appenders [{:type :console}
+              {:type :file
+               :filename "/var/log/baymax/baymax.log"
+               :rolling true}]}}
+
+</content>
+
+<file>./dev/resources/sample-config.edn</file>
+<content>
+{:sources
+ {:main-db
+  {:type :postgres
+   :connection {:host "db.example.com"
+                :port 5432
+                :database "production"
+                :user "metrics_user"
+                :password "foobar"}
+   :pool {:maximum-pool-size 10
+          :minimum-idle 2}
+   :trusted true}
+
+  :analytics-db
+  {:type :postgres
+   :connection {:host "analytics.example.com"
+                :port 5432
+                :database "analytics"
+                :user "readonly"
+                :password-env "ANALYTICS_PASSWORD"}
+   :trusted true}
+
+  :app-api
+  {:type :http
+   :base-url "https://api.example.com"
+   :headers {"Authorization" "Bearer ${API_TOKEN}"}
+   :trusted true}
+
+  :app-jmx
+  {:type :jmx
+   :connection {:host "app1.example.com"
+                :port 1099}
+   :trusted true}}
+
+ :collectors
+ [
+  ;; account metrics from main DB
+
+  {:id "account-metrics"
+   :source :main-db
+   :schedule "1m"
+   :query "select i.status, i.amount_type, count(*) as count
+           from abc.account i
+           where i.amount_type in ('TYPE_A', 'TYPE_B', 'TYPE_C')
+             and i.status in ('ACTIVE', 'PENDING', 'CLOSED')
+           group by i.status, i.amount_type"
+   :transform "(fn [rows]
+                 (mapv (fn [{:keys [status amount_type count]}]
+                         {:name (str \"accounts.\" status \".\" amount_type)
+                          :value count
+                          :labels {:status status
+                                   :amount_type amount_type
+                                   :service \"accounts-api\"}})
+                       rows))"}
+
+  ;; transaction metrics from main db
+
+  {:id "transaction-metrics"
+   :source :main-db
+   :schedule "5m"
+   :query "select transaction_type,
+                  count(*) as total,
+                  avg(amount) as avg_amount,
+                  sum(amount) as sum_amount
+           from transactions
+           where created_at > now() - interval '1 day'
+           group by transaction_type"
+   :transform "(fn [rows]
+                 (mapcat (fn [{:keys [transaction_type total avg_amount sum_amount]}]
+                           [{:name \"transactions.count\"
+                             :value total
+                             :labels {:type transaction_type}}
+                            {:name \"transactions.avg_amount\"
+                             :value avg_amount
+                             :labels {:type transaction_type}}
+                            {:name \"transactions.total_amount\"
+                             :value sum_amount
+                             :labels {:type transaction_type}}])
+                         rows))"}
+
+  ;; user activity metrics from analytics DB
+
+  {:id "user-activity"
+   :source :analytics-db
+   :schedule "15m"
+   :query "select country, device_type, count(distinct user_id) as active_users
+           from user_sessions
+           where session_start > now() - interval '1 hour'
+           group by country, device_type"
+   :transform "(fn [rows]
+                 (mapv (fn [{:keys [country device_type active_users]}]
+                         {:name \"active_users\"
+                          :value active_users
+                          :labels {:country country
+                                   :device device_type}})
+                       rows))"}
+
+  ;; api health check
+
+  {:id "api-health"
+   :source :app-api
+   :schedule "30s"
+   :path "/health"
+   :method "GET"
+   :transform "(fn [response]
+                 (let [status (:status response)
+                       body (:body response)
+                       healthy (= status 200)]
+                   [{:name \"api.healthy\"
+                     :value (if healthy 1 0)
+                     :labels {:service \"main-api\"}}
+                    {:name \"api.response_time\"
+                     :value (get-in body [:metrics :response_time] 0)
+                     :labels {:service \"main-api\"}}]))"}
+
+  ;; jvm metrics via jmx
+
+  {:id "jvm-metrics"
+   :source :app-jmx
+   :schedule "1m"
+   :beans [["java.lang:type=Memory" "HeapMemoryUsage"]
+           ["java.lang:type=Threading" "ThreadCount"]
+           ["java.lang:type=OperatingSystem" "ProcessCpuLoad"]]
+   :transform "(fn [results]
+                 (map (fn [[bean attr value]]
+                        (let [bean-name (last (clojure.string/split bean #\"=\"))
+                              metric-name (str \"jvm.\"
+                                               (-> bean-name
+                                                   (clojure.string/lower-case)
+                                                   (clojure.string/replace #\"[^a-z0-9]\" \"_\"))
+                                               \".\"
+                                               (-> attr
+                                                   (clojure.string/lower-case)
+                                                   (clojure.string/replace #\"[^a-z0-9]\" \"_\")))]
+                          {:name metric-name
+                           :value (if (map? value)
+                                    (get value :used 0)
+                                    value)
+                           :labels {:service \"app1\"}}))
+                      results))"}]
+
+
+ :publishers
+ [{:type :prometheus
+   :port 9090
+   :endpoint "/metrics"
+   :collectors ["account-metrics"
+                "transaction-metrics"
+                "user-activity"
+                "api-health"
+                "jvm-metrics"]}
+
+  {:type :influxdb
+   :url "https://influx.example.com"
+   :token-env "INFLUX_TOKEN"
+   :org "example-org"
+   :bucket "metrics"
+   :collectors ["account-metrics"
+                "transaction-metrics"]}]
+
+ :scheduler
+ {:default-interval "1m"
+  :thread-pool-size 5}
+
+ :web
+ {:port 4242
+  :auth {:user "admin"
+         :password-env "ADMIN_PASSWORD"}}
+
+ :logging
+ {:level :info
+  :appenders [{:type :console}
+              {:type :file
+               :filename "/var/log/baymax/baymax.log"
+               :rolling true}]}}
+
+</content>
+
+<file>./dev/dev.clj</file>
+<content>
+(ns dev
+  (:require [clj-http.client :as http]
+            [jsonista.core :as json]
+            [clojure.string :as s]
+            [clojure.java.io :as io]
+            [clojure.repl :refer :all]
+            [clojure.pprint :refer [pprint]]
+            [yang.lang :as y]
+            [baymax.config :as c]
+            [baymax.chip :as chip]
+            [baymax.scheduler :as scheduler]
+            [baymax.source.postgres :as pg]))
+
+</content>
+
+<file>./src/baymax/publisher.clj</file>
+<content>
+(ns baymax.publisher
+  (:require [baymax.publisher.prometheus :as prometheus]
+            [baymax.publisher.stdout :as stdout]
+            ; [baymax.publisher.influxdb :as influxdb]
+            ; [baymax.publisher.elastic :as elastic]
+            ))
+
+(defn make-publisher [config]
+  (case (:type config)
+    :prometheus (prometheus/make-publisher config)
+    :stdout     (stdout/make-publisher config)
+    ; :influxdb (influxdb/make-publisher config)
+    ; :elastic  (elastic/make-publisher config)
+    (throw (ex-info "unknown publisher type" {:config config
+                                              :supported-types [:prometheus :stdout]}))))
+
+</content>
+
+<file>./src/baymax/sandbox.clj</file>
+<content>
+(ns baymax.sandbox
+  (:require [sci.core :as sci]))
+
+(def allowed-namespaces
+  {'clojure.core {'map map, 'mapv mapv, 'filter filter, 'reduce reduce,
+                  'comp comp, 'partial partial,
+                  'mapcat mapcat,
+                  'get get, 'get-in get-in, 'assoc assoc, 'assoc-in assoc-in,
+                  'update update, 'merge merge,
+                  'str str, 'vector vector, 'hash-map hash-map,
+                  'count count, 'first first, 'rest rest, 'conj conj,
+                  '= =, '< <, '> >, '<= <=, '>= >=}
+   'clojure.string {'join clojure.string/join, 'split clojure.string/split,
+                    'replace clojure.string/replace, 'upper-case clojure.string/upper-case,
+                    'lower-case clojure.string/lower-case, 'trim clojure.string/trim,
+                    'starts-with? clojure.string/starts-with?, 'ends-with? clojure.string/ends-with?}})
+
+(def default-options
+  {:namespaces allowed-namespaces
+   :allow-def #{}                                         ;; no persistent defs
+   :deny ['clojure.core/def 'clojure.core/alter-var-root] ;; juuuust in case
+   :classes {}                                            ;; no java interop
+   :timeout 2000                                          ;; 2 second timeout
+   :max-heap-size (* 5 1024 1024)})                       ;; 5MB heap
+
+(def secure-context
+  (sci/init default-options))
+
+(defn eval-fn [sfun]
+  (try
+    (let [result (sci/eval-string sfun secure-context)]
+      (if (fn? result)
+        result
+        (fn [_] result)))
+    (catch Exception e
+      (println "could not run function [" sfun "] in sandbox due to:" (.getMessage e))
+      (fn [_] {:error (.getMessage e)}))))
+
+</content>
+
+<file>./src/baymax/scheduler.clj</file>
+<content>
+(ns baymax.scheduler
+  (:require [yang.scheduler :as ys]
+            [clojure.tools.logging :as log]
+            [baymax.source.proto :as source]
+            [baymax.publisher.proto :as publisher]
+            [baymax.chip :as cp]
+            [baymax.config :as config])
+  (:import [java.util.concurrent TimeUnit]
+           [java.time Instant ZonedDateTime ZoneId]
+           [java.time.format DateTimeFormatter]))
+
+(defn format-instant [instant]
+  (let [formatter (DateTimeFormatter/ofPattern "yyyy-MM-dd HH:mm:ss")
+        zdt (ZonedDateTime/ofInstant instant (ZoneId/systemDefault))]
+    (.format formatter zdt)))
+
+(defn create-collector-task [chip collector-id]
+  (let [collector (cp/find-collector chip
+                                     collector-id)
+        source-id (:source collector)
+        source (get-in chip [:sources source-id])
+        publishers (cp/find-publishers chip
+                                       collector-id)]
+
+    (fn collect-task []
+      (try
+        (log/info "collecting intel for" collector-id "from source" source-id)
+        (let [start-time (System/currentTimeMillis)
+              intel (source/collect source collector)
+              duration (- (System/currentTimeMillis) start-time)]
+
+          (log/info "collected intel for" collector-id
+                    "in" duration "ms")
+
+          ;; publish intel to all associated publishers
+          (doseq [pub publishers]
+            (try
+              (log/debug "publishing intel from" collector-id "to" (-> pub :config :type))
+              (publisher/publish pub intel)
+              (catch Exception e
+                (log/error "could not publish intel for" collector-id "to" (-> pub :config :type) "due to" (.getMessage e))))))
+
+        (catch Exception e
+          (log/error e "could not collect intel for" collector-id "from source" source-id))))))
+
+(defn schedule-collector [chip collector-id]
+  (let [collector (cp/find-collector chip
+                                     collector-id)
+        interval-ms (:interval-ms collector)
+        collector-task (create-collector-task chip
+                                              collector-id)]
+
+    (log/info "scheduling collector" collector-id "with interval" interval-ms "ms")
+
+    (ys/every interval-ms collector-task
+              {:task-name (str "collector-" collector-id)
+               :time-unit TimeUnit/MILLISECONDS})))
+
+(defn start
+  "start all scheduled collectors based on intel burned into a chip
+   return a map of collector ids to their scheduled tasks"
+  [chip]
+  (let [collector-ids (map :id (:collectors chip))
+        schedules (reduce (fn [acc collector-id]
+                            (assoc acc collector-id
+                                   (schedule-collector chip
+                                                       collector-id)))
+                          {}
+                          collector-ids)]
+
+    (log/info "scheduled " (count schedules) "collectors")
+
+    {:schedules schedules         ;; collector id => scheduler
+     :chip chip                   ;; the chip that was used to schedule
+     :started-at (Instant/now)}))
+
+(defn stop
+  "stop all scheduled collector tasks"
+  [{:keys [schedules]}]
+  (doseq [[collector-id schedule] schedules]
+    (log/info "cancel schedule for a collector" collector-id)
+    ((:cancel schedule)))
+  (log/info "all collector schedules are cancelled"))
+
+(defn status
+  "return the current status of all schedules"
+  [{:keys [schedules started-at]}]
+  (let [now (Instant/now)
+        uptime (- (.toEpochMilli now) (.toEpochMilli started-at))
+        status (mapv (fn [[collector-id schedule]]
+                       (let [intel (:intel schedule)]
+                         {:id collector-id
+                          :running? ((:running? intel))
+                          :cancelled? ((:cancelled? intel))
+                          :done? ((:done? intel))
+                          :next-run (some-> ((:next-run intel))
+                                            format-instant)
+                          :interval (:interval intel)}))
+                     schedules)]
+
+    {:status "running"
+     :started-at (format-instant started-at)
+     :uptime-ms uptime
+     :uptime-human (format "%d days %d hours %d minutes %d seconds"
+                           (quot uptime (* 24 60 60 1000))
+                           (quot (mod uptime (* 24 60 60 1000)) (* 60 60 1000))
+                           (quot (mod uptime (* 60 60 1000)) (* 60 1000))
+                           (quot (mod uptime (* 60 1000)) 1000))
+     :schedules status}))
+
+(defn health
+  "check health of all scheduled collectors"
+  [{:keys [schedules chip]}]
+  (let [sources (:sources chip)
+        source-health (reduce-kv (fn [acc id source]
+                                   (assoc acc id (source/health-check source)))
+                                 {}
+                                 sources)
+        collector-health (reduce (fn [acc [collector-id schedule]]
+                                   (let [intel (:intel schedule)
+                                         collector (get-in chip [:collectors collector-id])
+                                         source-id (:source collector)
+                                         source-status (get-in source-health [source-id :healthy])]
+                                     (assoc acc collector-id
+                                            {:id collector-id
+                                             :scheduled? true
+                                             :running? ((:running? intel))
+                                             :source-id source-id
+                                             :source-healthy? source-status})))
+                                 {}
+                                 schedules)]
+
+    {:sources source-health
+     :collectors collector-health
+     :healthy? (and (every? (fn [[_ status]] (:healthy status)) source-health)
+                   (every? (fn [[_ status]] (:running? status)) collector-health))}))
+
+
+;; ----------
+(defn collect
+  "manually trigger collection for a specific collector"
+  [chip collector-id]
+  (let [task (create-collector-task chip
+                                    collector-id)]
+    (log/info "manually triggering collection for" collector-id)
+    (task)
+    {:status "completed"
+     :collector-id collector-id
+     :timestamp (format-instant (Instant/now))}))
+
+</content>
+
+<file>./src/baymax/publisher/proto.clj</file>
+<content>
+(ns baymax.publisher.proto)
+
+(defprotocol Publisher
+  (publish [this intel] "publish intel to the destination")
+  (health-check [this] "check the health of the destination")
+  (disconnect [this] "clean up resources and disconnect from the destination"))
+
+
+
+</content>
+
+<file>./src/baymax/publisher/prometheus.clj</file>
+<content>
+(ns baymax.publisher.prometheus)
+
+(defn make-publisher [config])
+
+
+</content>
+
+<file>./src/baymax/publisher/stdout.clj</file>
+<content>
+(ns baymax.publisher.stdout
+  (:require [baymax.publisher.proto :refer [Publisher]]
+            [clojure.string :as s]
+            [clojure.pprint :as pp]
+            [clojure.tools.logging :as log]))
+
+(defrecord StdoutPublisher [config]
+  Publisher
+  (publish [this intel]
+    (let [timestamp (java.time.LocalDateTime/now)
+          formatter (java.time.format.DateTimeFormatter/ofPattern "yyyy-MM-dd HH:mm:ss")
+          formatted-time (.format timestamp formatter)]
+
+      (println "\n================= intel ==================== |" formatted-time)
+
+      (pp/pprint intel)
+
+      (println "============================================")
+
+      {:published (count intel)
+       :timestamp formatted-time}))
+
+  (health-check [this]
+    {:healthy true
+     :status "available"
+     :message "stdout is 6 feet above"})
+
+  (disconnect [this]
+    {:status "disconnected"}))
+
+(defn make-publisher [config]
+  (let [conf (merge {:pretty-print true
+                     :color false}
+                    config)]
+    (log/info "making stdout publisher")
+    (->StdoutPublisher conf)))
+
+</content>
+
+<file>./src/baymax/source.clj</file>
+<content>
+(ns baymax.source
+  (:require [clojure.tools.logging :as log]
+            [baymax.source.postgres :as pg]
+            ; [baymax.source.http :as http]
+            ; [baymax.source.jmx :as jmx]
+            ))
+
+(defn make-source [config]
+  (case (:type config)
+    :postgres (pg/make-source config)
+    ; :http (http/make-source config)
+    ; :jmx (jmx/make-source config)
+    (throw (ex-info "unknown source type" {:config config
+                                           :supported-types [:postgres]}))))
+
+</content>
+
+<file>./src/baymax/source/proto.clj</file>
+<content>
+(ns baymax.source.proto)
+
+(defprotocol Source
+  (collect [this collector] "collect intel for a given collector")
+  (health-check [this] "check the health of this source")
+  (disconnect [this] "clean up resources and disconnect from the source"))
+
+
+</content>
+
+<file>./src/baymax/source/postgres.clj</file>
+<content>
+(ns baymax.source.postgres
+  (:require [hikari-cp.core :as hikari]
+            [next.jdbc :as jdbc]
+            [next.jdbc.result-set :as rs]
+            [camel-snake-kebab.core :as csk]
+            [clojure.tools.logging :as log]
+            [clojure.string :as s]
+            [baymax.source.proto :refer [Source]]))
+
+(def default-pool-config
+  {:minimum-idle 2
+   :maximum-pool-size 10
+   :auto-commit true
+   :connection-timeout 30000
+   :idle-timeout 600000
+   :max-lifetime 1800000
+   :validation-timeout 5000
+   :pool-name "baymax-pool"})
+
+(defn execute-query
+  [{:keys [datasource]} query]
+  (try
+    (->> (jdbc/execute! datasource [query]
+                        {:builder-fn rs/as-unqualified-modified-maps
+                         :label-fn csk/->kebab-case-keyword}))
+    (catch Exception e
+      (log/error e "failed to execute postgres query:" query)
+      (throw (ex-info "query execution failed"
+                      {:query query
+                       :error (.getMessage e)})))))
+
+(defn collect
+  "collect metrics from a postgres source based on query"
+  [source {:keys [query transform]}]
+  (let [collected (execute-query source query)]
+    (transform collected)))
+
+(defn check-health
+  "check if the postgres connection is healthy"
+  [{:keys [datasource]}]
+  (try
+    (when (jdbc/execute-one! datasource ["SELECT 1 as health"])
+      {:healthy true
+       :status "connected"
+       :message "database connection is 6 feet above"})
+    (catch Exception e
+      {:healthy false
+       :status "error"
+       :message (.getMessage e)})))
+
+(defn close [{:keys [datasource]}]
+  (when datasource
+    (hikari/close-datasource datasource)))
+
+(defn make-datasource [{:keys [connection pool]}]
+  (let [{:keys [host port database user password]} connection
+        hikari-config (merge default-pool-config
+                             (select-keys pool [:minimum-idle
+                                                :maximum-pool-size
+                                                :idle-timeout])
+                             {:adapter "postgresql"
+                              :server-name host
+                              :port-number port
+                              :database-name database
+                              :username user
+                              :password password})]
+    (hikari/make-datasource hikari-config)))
+
+
+(defrecord PostgresSource [config datasource]
+  Source
+  (collect [this {:keys [query transform]}]
+    (let [collected (execute-query this query)]
+      (transform collected)))
+
+  (health-check [this]
+    (check-health this))
+
+  (disconnect [this]
+    (when datasource
+      (hikari/close-datasource datasource)
+      (log/info "disconnected from postgres:"
+                (get-in config [:connection :host])))))
+
+(defn make-source [config]
+  (let [datasource (make-datasource config)
+        config (update-in config [:connection]
+                          dissoc :password)]
+    (->PostgresSource config datasource)))
+
+</content>
+
+<file>./src/baymax/server.clj</file>
+<content>
+(ns baymax.server)
+
+</content>
+
+<file>./src/baymax/chip.clj</file>
+<content>
+(ns baymax.chip
+  (:require [clojure.tools.logging :as log]
+            [baymax.source :as source]
+            [baymax.publisher :as publisher]))
+
+(defn flash [config]
+  (let [sources (reduce (fn [acc [id sconfig]]
+                          (assoc acc id (source/make-source sconfig)))
+                        {}
+                        (:sources config))
+
+        collectors (:collectors config)
+
+        publishers (mapv publisher/make-publisher
+                         (:publishers config))]
+    {:sources sources
+     :collectors collectors
+     :publishers publishers
+     :config config}))
+
+(defn find-collector [chip cid]
+  (some (fn [collector]
+          (when (= cid (:id collector))
+            collector))
+        (:collectors chip)))
+
+(defn find-publishers
+  "find all publishers that this collector in their list"
+  [chip cid]
+  (filter #(some->> %
+                    :config
+                    :collectors
+                    (some #{cid}))
+          (:publishers chip)))
+
+
+</content>
+
+<file>./src/baymax/config.clj</file>
+<content>
+(ns baymax.config
+  (:require [cprop.core :as cp]
+            [baymax.sandbox :refer [eval-fn]]
+            [clojure.string :as str])
+  (:import (java.util.concurrent TimeUnit)))
+
+(def ^:private time-units
+  {"ms" TimeUnit/MILLISECONDS
+   "s"  TimeUnit/SECONDS
+   "m"  TimeUnit/MINUTES
+   "h"  TimeUnit/HOURS
+   "d"  TimeUnit/DAYS})
+
+(defn- parse-duration
+  "convert duration strings like '30s', '5m', etc. to milliseconds"
+  [duration]
+  (if-not (string? duration)
+    duration
+    (if-let [[_ amount unit] (re-matches #"(\d+)([a-z]+)" duration)]
+      (let [amount (Long/parseLong amount)
+            unit (get time-units unit)]
+        (if unit
+          (.toMillis unit amount)
+          (throw (ex-info (str "unknown time unit: " unit)
+                          {:duration duration}))))
+      (throw (ex-info (str "invalid duration format: " duration
+                           " expected format: <number><unit> (e.g. 5m, 30s)")
+                      {:duration duration})))))
+
+;; source and collector lookup functions
+
+(defn find-collector [config cid]
+  (some (fn [collector]
+          (when (= cid (:id collector))
+            collector))
+        (:collectors config)))
+
+(defn find-source
+  "lookup a source by id from the available sources"
+  [config source-id]
+  (get-in config [:sources source-id]))
+
+(defn- resolve-transformer
+  "resolve collector transform function string to a function"
+  [collector]
+  (if-let [transform (:transform collector)]
+    (assoc collector :transform (eval-fn transform))
+    collector))
+
+(defn- add-schedule
+  "convert schedule string to milliseconds"
+  [collector config]
+  (if-let [schedule (:schedule collector)]
+    (let [default-interval (get-in config [:scheduler :default-interval] "1m")
+          duration (or schedule default-interval)
+          interval-ms (parse-duration duration)]
+      (assoc collector :interval-ms interval-ms))
+    collector))
+
+(defn parse-collector
+  "process a collector configuration, resolving transform function and schedule"
+  [collector config]
+  (-> collector
+      resolve-transformer
+      (add-schedule config)))
+
+(defn- validate-sources
+  "validate that all required sources exist and are properly configured"
+  [config]
+  (doseq [collector (:collectors config)]
+    (when-let [source-id (:source collector)]
+      (when-not (find-source config source-id)
+        (throw (ex-info (str "collector references non-existent source: " source-id)
+                        {:collector-id (:id collector)
+                         :source-id source-id})))))
+  config)
+
+(defn- validate-publishers
+  "validate that all collectors referenced by publishers exist"
+  [config]
+  (doseq [publisher (:publishers config)]
+    (let [publisher-collectors (get publisher :collectors [])]
+      (doseq [collector-id publisher-collectors]
+        (when-not (find-collector config collector-id)
+          (throw (ex-info (str "publisher references non-existent collector: " collector-id)
+                          {:publisher-type (:type publisher)
+                           :collector-id collector-id}))))))
+  config)
+
+(defn make-all
+  "given config, resolve all functions, sources, collectors, transformers and schedules"
+  [config]
+  (let [collectors (mapv #(parse-collector % config) (:collectors config))
+        scheduler (update-in (:scheduler config)
+                             [:default-interval]
+                             parse-duration)]
+    (-> config
+        validate-sources
+        validate-publishers
+        (assoc :collectors collectors)
+        (assoc :scheduler scheduler))))
+
+(defn load-config
+  "load and process the config"
+  []
+  (-> (cp/load-config) ;; classpath config.edn / -Dconf="../somepath/baymax.edn" / etc..
+       make-all))
+
+</content>
+
