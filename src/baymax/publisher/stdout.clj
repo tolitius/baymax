@@ -1,5 +1,5 @@
 (ns baymax.publisher.stdout
-  (:require [baymax.proto :refer [Publisher]]
+  (:require [baymax.publisher.proto :refer [Publisher]]
             [clojure.string :as s]
             [clojure.pprint :as pp]
             [clojure.tools.logging :as log]))

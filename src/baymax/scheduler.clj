@@ -1,7 +1,8 @@
 (ns baymax.scheduler
   (:require [yang.scheduler :as ys]
             [clojure.tools.logging :as log]
-            [baymax.proto :as proto]
+            [baymax.source.proto :as source]
+            [baymax.publisher.proto :as publisher]
             [baymax.chip :as cp]
             [baymax.config :as config])
   (:import [java.util.concurrent TimeUnit]
@@ -25,7 +26,7 @@
       (try
         (log/info "collecting intel for" collector-id "from source" source-id)
         (let [start-time (System/currentTimeMillis)
-              intel (proto/collect source collector)
+              intel (source/collect source collector)
               duration (- (System/currentTimeMillis) start-time)]
 
           (log/info "collected intel for" collector-id
@@ -35,7 +36,7 @@
           (doseq [pub publishers]
             (try
               (log/debug "publishing intel from" collector-id "to" (-> pub :config :type))
-              (proto/publish pub intel)
+              (publisher/publish pub intel)
               (catch Exception e
                 (log/error "could not publish intel for" collector-id "to" (-> pub :config :type) "due to" (.getMessage e))))))
 
@@ -69,7 +70,8 @@
 
     (log/info "scheduled " (count schedules) "collectors")
 
-    {:schedules schedules       ;; collector id => scheduler
+    {:schedules schedules         ;; collector id => scheduler
+     :chip chip                   ;; the chip that was used to schedule
      :started-at (Instant/now)}))
 
 (defn stop
@@ -111,7 +113,7 @@
   [{:keys [schedules chip]}]
   (let [sources (:sources chip)
         source-health (reduce-kv (fn [acc id source]
-                                   (assoc acc id (proto/health-check source)))
+                                   (assoc acc id (source/health-check source)))
                                  {}
                                  sources)
         collector-health (reduce (fn [acc [collector-id schedule]]

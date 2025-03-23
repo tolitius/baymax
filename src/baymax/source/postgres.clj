@@ -5,7 +5,7 @@
             [camel-snake-kebab.core :as csk]
             [clojure.tools.logging :as log]
             [clojure.string :as s]
-            [baymax.proto :refer [Source]]))
+            [baymax.source.proto :refer [Source]]))
 
 (def default-pool-config
   {:minimum-idle 2
