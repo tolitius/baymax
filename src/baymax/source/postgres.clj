@@ -1,10 +1,11 @@
-(ns baymax.collector.postgres
+(ns baymax.source.postgres
   (:require [hikari-cp.core :as hikari]
             [next.jdbc :as jdbc]
             [next.jdbc.result-set :as rs]
             [camel-snake-kebab.core :as csk]
             [clojure.tools.logging :as log]
-            [clojure.string :as s]))
+            [clojure.string :as s]
+            [baymax.proto :refer [Source]]))
 
 (def default-pool-config
   {:minimum-idle 2
@@ -51,10 +52,7 @@
   (when datasource
     (hikari/close-datasource datasource)))
 
-(defn make-source
-  "create a postgres source from config"
-  [{:keys [connection pool]
-    :as config}]
+(defn make-datasource [{:keys [connection pool]}]
   (let [{:keys [host port database user password]} connection
         hikari-config (merge default-pool-config
                              (select-keys pool [:minimum-idle
@@ -66,8 +64,26 @@
                               :database-name database
                               :username user
                               :password password})]
-    {:datasource (hikari/make-datasource hikari-config)
-     :type :postgres
-     :config (update config :connection dissoc :password)}))
+    (hikari/make-datasource hikari-config)))
 
-;; TODO: protocol it out, so it can be used by the "chip" registry
+
+(defrecord PostgresSource [config datasource]
+  Source
+  (collect [this {:keys [query transform]}]
+    (let [collected (execute-query this query)]
+      (transform collected)))
+
+  (health-check [this]
+    (check-health this))
+
+  (disconnect [this]
+    (when datasource
+      (hikari/close-datasource datasource)
+      (log/info "disconnected from postgres:"
+                (get-in config [:connection :host])))))
+
+(defn make-source [config]
+  (let [datasource (make-datasource config)
+        config (update-in config [:connection]
+                          dissoc :password)]
+    (->PostgresSource config datasource)))

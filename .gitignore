@@ -19,3 +19,4 @@ doo-index.html
 .cljs_rhino_repl/
 out/
 .DS_Store
+dev/config.edn

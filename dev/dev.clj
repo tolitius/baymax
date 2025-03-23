@@ -7,4 +7,6 @@
             [clojure.pprint :refer [pprint]]
             [yang.lang :as y]
             [baymax.config :as c]
-            [baymax.collector.postgres :as pg]))
+            [baymax.chip :as chip]
+            [baymax.scheduler :as scheduler]
+            [baymax.source.postgres :as pg]))
