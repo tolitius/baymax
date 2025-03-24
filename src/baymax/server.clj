@@ -60,6 +60,17 @@
    ["/intel/:collector-id/:format" {:get collector-intel-handler}]
    ["/intel/:collector-id" {:get collector-intel-handler}]])
 
+
+(def default-handler
+  (let [encode-json (fn [status data]
+                      {:status status
+                       :headers {"Content-Type" "application/json"}
+                       :body (m/encode m/instance "application/json" data)})]
+    (ring/create-default-handler
+      {:not-found          (fn [_] (encode-json 404 {:error "route not found"}))
+       :method-not-allowed (fn [_] (encode-json 405 {:error "method not allowed"}))
+       :not-acceptable     (fn [_] (encode-json 406 {:error "not acceptable"}))})))
+
 (def app
   (ring/ring-handler
    (ring/router
@@ -71,10 +82,9 @@
                          rrc/coerce-exceptions-middleware
                          rrc/coerce-request-middleware
                          rrc/coerce-response-middleware]}})
-   (ring/create-default-handler
-    {:not-found          (constantly {:status 404, :body {:error "route not found"}})
-     :method-not-allowed (constantly {:status 405, :body {:error "method not allowed"}})
-     :not-acceptable     (constantly {:status 406, :body {:error "not acceptable"}})})))
+   (ring/routes
+     (ring/redirect-trailing-slash-handler)
+     default-handler)))
 
 (defn start-server [config]
   (let [port (get-in config [:web :port] 4242)]
