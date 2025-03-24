@@ -47,8 +47,8 @@
 
 (defn health-handler [_]
   {:status 200
-   :body {:status "healthy"
-          :service "baymax"
+   :body {:status "6 feet above"
+          :app "baymax"
           :timestamp (java.time.Instant/now)}})
 
 (def app-routes

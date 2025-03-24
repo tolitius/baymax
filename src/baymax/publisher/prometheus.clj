@@ -2,57 +2,58 @@
   (:require [baymax.publisher.proto :refer [Publisher]]
             [clojure.string :as s]
             [clojure.tools.logging :as log])
-  (:import [io.prometheus.client Gauge GaugeMetricFamily CollectorRegistry SimpleCollector]
+  (:import [io.prometheus.client Gauge GaugeMetricFamily CollectorRegistry Collector SimpleCollector]
            [io.prometheus.client.exporter.common TextFormat]))
 
 (defn make-publisher [config]
   :to-implement)
 
-(defn name->prometheus [name]
-  (-> (str name)
-      (s/replace #"[^a-zA-Z0-9_:]" "_")))
+(defn name->prometheus [metric-name]
+  (-> (if (keyword? metric-name)
+        (name metric-name)
+        (str metric-name))
+      (clojure.string/replace #"[^a-zA-Z0-9_]" "_")))
 
 (defn metrics->prometheus
-  "Format metrics for Prometheus using the client library (on-demand)"
+  "clojure maps to prometheus metrics"
   [metrics]
-  (let [registry (CollectorRegistry.)
-        metric-families (atom {})]
+  (let [registry (CollectorRegistry.)]
 
-    ;; group metrics by name
-    (doseq [{:keys [name value labels]} metrics]
-      (let [metric-name (name->prometheus name)
-            help-text (str "Metric: " metric-name)
-            label-keys (keys labels)
+    ;; Group metrics by name
+    (let [by-name (group-by :name metrics)]
+      (doseq [[metric-name metrics-group] by-name]
+        (let [safe-name (name->prometheus (str metric-name))
+              first-metric (first metrics-group)
+              label-keys (keys (:labels first-metric))
+              sanitized-label-keys (map (fn [k]
+                                          [(name->prometheus k) k])
+                                        label-keys)
 
-            ;; make metric family
-            family (if-let [existing (get @metric-families metric-name)]
-                     existing
-                     (let [new-family (GaugeMetricFamily.
-                                      metric-name
-                                      help-text
-                                      (java.util.ArrayList. (map name label-keys)))]
-                       (swap! metric-families assoc metric-name new-family)
-                       new-family))]
+              ;; Create a simple counter
+              gauge (-> (Gauge/build)
+                        (.name safe-name)
+                        (.help (str "Metric: " safe-name))
+                        (.labelNames (into-array String (map first sanitized-label-keys)))
+                        (.register registry))]
 
-        ;; add sample to the metric family
-        (.addMetricValue family
-                        (java.util.ArrayList. (map str (vals labels)))
-                        (double value))))
+          ;; Add each sample with its labels
+          (doseq [{:keys [value labels]} metrics-group]
+            (let [label-values (map (fn [[sanitized original]]
+                                      (str (get labels original)))
+                                    sanitized-label-keys)]
+              (-> gauge
+                  (.labels (into-array String label-values))
+                  (.set (double value))))))))
 
-    ;; register it all
-    (doseq [[_ family] @metric-families]
-      (.register family registry))
-
-    ;; export registry to string
+    ;; Export registry to string
     (let [writer (java.io.StringWriter.)]
-      (TextFormat/write004 writer registry)
+      (TextFormat/write004 writer (.metricFamilySamples registry))
       (.toString writer))))
 
 (defn format-metrics [collector-id metrics]
   (metrics->prometheus metrics))
 
 (defn format-all-metrics [metrics]
-  (let [metrics (mapcat
-                  (fn [[_ intel]] (:latest intel))
-                  metrics)]
+  (let [metrics (mapcat (comp :latest second)
+                        metrics)]
     (metrics->prometheus metrics)))
