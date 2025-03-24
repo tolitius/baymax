@@ -1,16 +1,44 @@
-.PHONY: clean jar tag outdated install deploy tree test repl
+.PHONY: clean jar tag image run outdated install deploy tree test repl
 
 clean:
 	rm -rf target
 
 jar: tag
-	clojure -X:uberjar :jar baymax.jar :main-class baymax.app
+	rm -rf target && mkdir target
+	clojure -X:uberjar :jar target/baymax-standalone.jar :main-class baymax.app
 
 outdated:
 	clojure -M:outdated
 
 tag:
 	clojure -A:tag
+
+## make image
+## make image VERSION=0.0.42
+image: jar
+	docker build -t baymax:$${VERSION:-latest} .
+
+BAYMAX_PORT ?= 4242
+
+run:
+	@if [ -z "$(BAYMAX_CONFIG)" ]; then \
+		echo "error: BAYMAX_CONFIG is not set. please set the BAYMAX_CONFIG environment variable to a path of baymax configuration file."; \
+		exit 1; \
+	fi
+	@if [ ! -f "$(BAYMAX_CONFIG)" ]; then \
+		echo "error: config file at $(BAYMAX_CONFIG) does not exist"; \
+		exit 1; \
+	fi
+	@if [ ! -f .env ]; then \
+		echo "error: '.env' file is missing. it needs to have env related: network, secrets, etc. overrides for baymax config."; \
+		exit 1; \
+	fi
+	@docker_run="docker run -d --env-file .env -v ${BAYMAX_CONFIG}:/opt/app/baymax/config.edn"; \
+	if [ -n "$(BAYMAX_PORT)" ]; then \
+		docker_run="$$docker_run -p $(BAYMAX_PORT):4242"; \
+	fi; \
+	$$docker_run baymax:$${VERSION:-latest}
+	@echo "baymax container is up and ready to rock & roll"
 
 install: jar
 	clojure -A:install
