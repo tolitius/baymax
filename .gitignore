@@ -20,3 +20,4 @@ doo-index.html
 out/
 .DS_Store
 dev/config.edn
+.env

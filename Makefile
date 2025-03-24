@@ -2,6 +2,7 @@
 
 clean:
 	rm -rf target
+	rm -rf .env
 
 jar: tag
 	rm -rf target && mkdir target
