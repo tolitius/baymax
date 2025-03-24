@@ -1,5 +1,7 @@
 (ns baymax.chip
   (:require [clojure.tools.logging :as log]
+            [mount.core :refer [defstate]]
+            [baymax.config :as env]
             [baymax.source :as source]
             [baymax.publisher :as publisher]))
 
@@ -33,3 +35,5 @@
                     (some #{cid}))
           (:publishers chip)))
 
+(defstate chip :start (flash env/config)
+               :stop  :unplugged)

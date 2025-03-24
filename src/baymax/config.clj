@@ -1,5 +1,6 @@
 (ns baymax.config
   (:require [cprop.core :as cp]
+            [mount.core :refer [defstate]]
             [baymax.sandbox :refer [eval-fn]]
             [clojure.string :as str])
   (:import (java.util.concurrent TimeUnit)))
@@ -105,3 +106,6 @@
   []
   (-> (cp/load-config) ;; classpath config.edn / -Dconf="../somepath/baymax.edn" / etc..
        make-all))
+
+(defstate config :start (load-config)
+                 :stop  :stopped)

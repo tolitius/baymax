@@ -1,6 +1,7 @@
 (ns baymax.scheduler
   (:require [yang.scheduler :as ys]
             [clojure.tools.logging :as log]
+            [mount.core :refer [defstate]]
             [baymax.source.proto :as source]
             [baymax.publisher.proto :as publisher]
             [baymax.chip :as cp]
@@ -139,6 +140,8 @@
      :healthy? (and (every? (fn [[_ status]] (:healthy status)) source-health)
                    (every? (fn [[_ status]] (:running? status)) collector-health))}))
 
+(defstate scheduler :start (start cp/chip)
+                    :stop  (stop scheduler))
 
 ;; ----------
 (defn collect

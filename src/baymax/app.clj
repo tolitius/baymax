@@ -5,13 +5,10 @@
             [mount.core :as mount :refer [defstate]]
             [mount-up.core :as mu]
             [baymax.config :as env]
-            [baymax.scheduler :as sch]
-            [baymax.chip :as cp]
-            [baymax.server :as web])
+            [baymax.scheduler]
+            [baymax.chip]
+            [baymax.server])
   (:gen-class))
-
-(defstate config :start (env/load-config)
-                 :stop  :stopped)
 
 (defn- start-nrepl [{:keys [host port]
                      :or {host "0.0.0.0"
@@ -19,17 +16,8 @@
   (nrepl/start-server :bind host
                       :port port))
 
-(defstate nrepl :start (start-nrepl (config :nrepl))
+(defstate nrepl :start (start-nrepl (env/config :nrepl))
                 :stop (nrepl/stop-server nrepl))
-
-(defstate chip :start (cp/flash config)
-               :stop  :unplugged)
-
-(defstate server :start (web/start-server config)
-                 :stop  (web/stop-server server))
-
-(defstate scheduler :start (sch/start chip)
-                    :stop  (sch/stop scheduler))
 
 (defn -main [& args]
   (ye/set-default-exception-handler)
@@ -41,10 +29,10 @@
                                (mount/stop))))
   ;; starting nrepl
   ;; to make sure app is accessible remotely in case some states won't be able to start
-  (mount/start #'baymax.app/config
+  (mount/start #'baymax.config/config
                #'baymax.app/nrepl)
   (log/info "baymax: flashing the chip.. [loading]")
-  (mount/start #'baymax.app/chip)
+  (mount/start #'baymax.chip/chip)
   (log/info "baymax: flashing the chip.. [done]")
 
   (mount/start)

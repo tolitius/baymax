@@ -7,7 +7,10 @@
             [reitit.ring.middleware.parameters :as parameters]
             [reitit.ring.middleware.muuntaja :as muuntaja]
             [muuntaja.core :as m]
+            [mount.core :refer [defstate]]
+            [baymax.config :as env]
             [baymax.registry :as registry]
+            [baymax.scheduler :as sch]
             [baymax.publisher.prometheus :as prometheus]
             [clojure.tools.logging :as log]))
 
@@ -45,6 +48,29 @@
       {:status 200
        :body {}})))
 
+;; scheduler handlers
+(defn schedule-health-handler [_]
+  {:status 200
+   :body (sch/health sch/scheduler)})
+
+(defn schedule-status-handler [_]
+  {:status 200
+   :body (sch/status sch/scheduler)})
+
+(defn collector-schedule-status-handler [request]
+  (let [collector-id (get-in request [:path-params :collector-id])
+        all-status (sch/status sch/scheduler)
+        collector-status (->> (:schedules all-status)
+                              (filter #(= collector-id (:id %)))
+                              first)]
+
+    (if collector-status
+      {:status 200
+       :body collector-status}
+      {:status 404
+       :body {:error (str "no schedule found for collector: " collector-id)
+              :collector-id collector-id}})))
+
 (defn health-handler [_]
   {:status 200
    :body {:status "6 feet above"
@@ -58,7 +84,11 @@
    ["/intel-all" {:get all-intel-handler}]
 
    ["/intel/:collector-id/:format" {:get collector-intel-handler}]
-   ["/intel/:collector-id" {:get collector-intel-handler}]])
+   ["/intel/:collector-id" {:get collector-intel-handler}]
+
+   ["/schedule/health" {:get schedule-health-handler}]
+   ["/schedule/status" {:get schedule-status-handler}]
+   ["/schedule/status/:collector-id" {:get collector-schedule-status-handler}]])
 
 
 (def default-handler
@@ -96,3 +126,6 @@
   (log/info "stopping baymax server")
   (.stop server)
   {:status "stopped"})
+
+(defstate server :start (start-server env/config)
+                 :stop  (stop-server server))
