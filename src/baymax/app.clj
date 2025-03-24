@@ -7,7 +7,8 @@
             [baymax.config :as env]
             [baymax.scheduler :as sch]
             [baymax.chip :as cp]
-            [baymax.server :as web]))
+            [baymax.server :as web])
+  (:gen-class))
 
 (defstate config :start (env/load-config)
                  :stop  :stopped)

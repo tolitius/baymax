@@ -4,7 +4,7 @@ clean:
 	rm -rf target
 
 jar: tag
-	clojure -A:jar
+	clojure -X:uberjar :jar baymax.jar :main-class baymax.app
 
 outdated:
 	clojure -M:outdated
