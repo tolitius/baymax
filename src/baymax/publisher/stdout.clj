@@ -4,6 +4,12 @@
             [clojure.pprint :as pp]
             [clojure.tools.logging :as log]))
 
+(defn print-intel-atomically [intel at]
+  (locking *out*
+    (println "\n================= intel ==================== |" at)
+    (clojure.pprint/pprint intel)
+    (println "============================================")))
+
 (defrecord StdoutPublisher [config]
   Publisher
   (publish [this intel]
@@ -11,11 +17,7 @@
           formatter (java.time.format.DateTimeFormatter/ofPattern "yyyy-MM-dd HH:mm:ss")
           formatted-time (.format timestamp formatter)]
 
-      (println "\n================= intel ==================== |" formatted-time)
-
-      (pp/pprint intel)
-
-      (println "============================================")
+      (print-intel-atomically intel formatted-time)
 
       {:published (count intel)
        :timestamp formatted-time}))
