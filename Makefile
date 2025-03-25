@@ -41,6 +41,12 @@ run:
 	$$docker_run baymax:$${VERSION:-latest}
 	@echo "baymax container is up and ready to rock & roll"
 
+push:
+	@docker login
+	@docker tag baymax:$${VERSION:-latest} tolitius/baymax:$${VERSION:-latest}
+	@docker push tolitius/baymax:$${VERSION:-latest}
+	@echo "baymax image pushed to docker hub: tolitius/baymax:$${VERSION:-latest}"
+
 install: jar
 	clojure -A:install
 

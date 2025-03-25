@@ -5,7 +5,7 @@ _**Baymax**, Big Hero 6_
 # baymax <img src="doc/img/baymax-logo.png" width="70px">
 [![<! release](https://img.shields.io/badge/dynamic/json.svg?label=release&url=https%3A%2F%2Fclojars.org%2Fbaymax%2Flatest-version.json&query=version&colorB=blue)](https://github.com/tolitius/baymax/releases)
 
-* **collects** intel from an arbitrary **sources**
+* **collects** intel from arbitrary **sources**
 * **transforms** them
 * **serves** them
 * and **publishes** them to arbitrary destinations
