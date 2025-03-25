@@ -14,8 +14,8 @@ outdated:
 tag:
 	clojure -A:tag
 
-## make image
-## make image VERSION=0.0.42
+##                make image
+## VERSION=0.0.42 make image
 image: jar
 	docker build -t baymax:$${VERSION:-latest} .
 
@@ -41,10 +41,23 @@ run:
 	$$docker_run baymax:$${VERSION:-latest}
 	@echo "baymax container is up and ready to rock & roll"
 
+
+## ARCH=multi       make push
+## ARCH=linux/amd64 make push
 push:
 	@docker login
-	@docker tag baymax:$${VERSION:-latest} tolitius/baymax:$${VERSION:-latest}
-	@docker push tolitius/baymax:$${VERSION:-latest}
+	@if [ -n "$(ARCH)" ] && [ "$(ARCH)" = "multi" ]; then \
+		echo "building and pushing multi-architecture image for linux/arm64/v8, linux/amd64"; \
+		docker buildx build \
+			--platform linux/arm64/v8,linux/amd64 \
+			-t tolitius/baymax:$${VERSION:-latest} \
+			--push \
+			.; \
+	else \
+		echo "pushing native architecture image ($$(docker version -f '{{.Client.Arch}}'))"; \
+		docker tag baymax:$${VERSION:-latest} tolitius/baymax:$${VERSION:-latest}; \
+		docker push tolitius/baymax:$${VERSION:-latest}; \
+	fi
 	@echo "baymax image pushed to docker hub: tolitius/baymax:$${VERSION:-latest}"
 
 install: jar
