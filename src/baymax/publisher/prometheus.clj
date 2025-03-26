@@ -19,7 +19,7 @@
   [metrics]
   (let [registry (CollectorRegistry.)]
 
-    ;; Group metrics by name
+    ;; group metrics by name
     (let [by-name (group-by :name metrics)]
       (doseq [[metric-name metrics-group] by-name]
         (let [safe-name (name->prometheus (str metric-name))
@@ -29,14 +29,14 @@
                                           [(name->prometheus k) k])
                                         label-keys)
 
-              ;; Create a simple counter
+              ;; create a simple counter
               gauge (-> (Gauge/build)
                         (.name safe-name)
                         (.help (str "Metric: " safe-name))
                         (.labelNames (into-array String (map first sanitized-label-keys)))
                         (.register registry))]
 
-          ;; Add each sample with its labels
+          ;; add each sample with its labels
           (doseq [{:keys [value labels]} metrics-group]
             (let [label-values (map (fn [[sanitized original]]
                                       (str (get labels original)))
@@ -45,7 +45,7 @@
                   (.labels (into-array String label-values))
                   (.set (double value))))))))
 
-    ;; Export registry to string
+    ;; export registry to string
     (let [writer (java.io.StringWriter.)]
       (TextFormat/write004 writer (.metricFamilySamples registry))
       (.toString writer))))

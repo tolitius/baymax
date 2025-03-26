@@ -15,10 +15,12 @@ _**Baymax**, Big Hero 6_
 
 ## run it
 
+### docker
+
 ```bash
 $ make image
 $ ## make your ".env" with overrides: hosts, ports, secrets, etc.
-$ export BAYMAX_CONFIG=path-to-baymax.edn; make run
+$ export BAYMAX_CONFIG=path-to-baymax-config.edn; make run
 
 092dd762c39eea90a80e4a812c7ec32dc666f66a36a1b3394083674a0dee612a
 baymax container is up and ready to rock & roll
@@ -30,6 +32,35 @@ up and running:
 http://localhost:4242/health
 http://localhost:4242/intel-all
 ...
+```
+
+or run it as an uberjar without docker..
+
+### uberjar
+
+override the [baymax config](https://github.com/tolitius/baymax/blob/master/dev/resources/sample-config.edn) with secrets / env jawns:
+
+```bash
+export SOURCES__SOME_DB__CONNECTION__HOST=...
+export SOURCES__SOME_DB__CONNECTION__PORT=...
+export SOURCES__SOME_DB__CONNECTION__DATABASE=...
+export SOURCES__SOME_DB__CONNECTION__USER=...
+export SOURCES__SOME_DB__CONNECTION__PASSWORD=...
+```
+
+> [!TIP]
+> _syntax follows the [way of cprop](https://github.com/tolitius/cprop?tab=readme-ov-file#speaking-env-variables)_ <img src="https://github.com/user-attachments/assets/c16f764f-1dc4-48fc-ac4b-370fd931a60e" width="32px"/>
+
+build the jar:
+
+```bash
+$ make jar
+```
+
+run it:
+
+```bash
+java -Dconf=<path to config.edn> -jar target/baymax-standalone.jar
 ```
 
 ## license

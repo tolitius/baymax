@@ -118,7 +118,7 @@
 
 (defn start-server [config]
   (let [port (get-in config [:web :port] 4242)]
-    (log/info "Starting Baymax server on port" port)
+    (log/info "starting baymax server on port" port)
     (jetty/run-jetty #'app {:port port
                             :join? false})))
 
