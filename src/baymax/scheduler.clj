@@ -106,11 +106,11 @@
     {:status "running"
      :started-at (format-instant started-at)
      :uptime-ms uptime
-     :uptime-human (format "%d days %d hours %d minutes %d seconds"
-                           (quot uptime (* 24 60 60 1000))
-                           (quot (mod uptime (* 24 60 60 1000)) (* 60 60 1000))
-                           (quot (mod uptime (* 60 60 1000)) (* 60 1000))
-                           (quot (mod uptime (* 60 1000)) 1000))
+     :uptime (format "%d days %d hours %d minutes %d seconds"
+                     (quot uptime (* 24 60 60 1000))
+                     (quot (mod uptime (* 24 60 60 1000)) (* 60 60 1000))
+                     (quot (mod uptime (* 60 60 1000)) (* 60 1000))
+                     (quot (mod uptime (* 60 1000)) 1000))
      :schedules status}))
 
 (defn health
