@@ -1,5 +1,7 @@
 (ns baymax.server
   (:require [ring.adapter.jetty :as jetty]
+            [ring.middleware.resource :as resource]
+            [clojure.java.io :as io]
             [reitit.ring :as ring]
             [reitit.core :as r]
             [reitit.coercion.spec]
@@ -77,8 +79,14 @@
           :app "baymax"
           :timestamp (java.time.Instant/now)}})
 
+(defn home-handler [_]
+  {:status 200
+   :headers {"Content-Type" "text/html"}
+   :body (slurp (io/resource "public/index.html"))})
+
 (def app-routes
-  [["/health" {:get health-handler}]
+  [["/" {:get home-handler}]
+   ["/health" {:get health-handler}]
 
    ["/intel-all/:format" {:get all-intel-handler}]
    ["/intel-all" {:get all-intel-handler}]
@@ -102,19 +110,20 @@
        :not-acceptable     (fn [_] (encode-json 406 {:error "not acceptable"}))})))
 
 (def app
-  (ring/ring-handler
-   (ring/router
-    app-routes
-    {:data {:coercion reitit.coercion.spec/coercion
-            :muuntaja m/instance
-            :middleware [parameters/parameters-middleware
-                         muuntaja/format-middleware
-                         rrc/coerce-exceptions-middleware
-                         rrc/coerce-request-middleware
-                         rrc/coerce-response-middleware]}})
-   (ring/routes
-     (ring/redirect-trailing-slash-handler)
-     default-handler)))
+  (-> (ring/ring-handler
+        (ring/router
+          app-routes
+          {:data {:coercion reitit.coercion.spec/coercion
+                  :muuntaja m/instance
+                  :middleware [parameters/parameters-middleware
+                               muuntaja/format-middleware
+                               rrc/coerce-exceptions-middleware
+                               rrc/coerce-request-middleware
+                               rrc/coerce-response-middleware]}})
+        (ring/routes
+          (ring/redirect-trailing-slash-handler)
+          default-handler))
+      (resource/wrap-resource "public")))
 
 (defn start-server [config]
   (let [port (get-in config [:web :port] 4242)]
