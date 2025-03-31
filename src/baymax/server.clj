@@ -99,6 +99,19 @@
    ["/schedule/status/:collector-id" {:get collector-schedule-status-handler}]])
 
 
+(defn make-base-path [path]
+  (if (.endsWith path "/")
+    path
+    (str path "/")))
+
+(defn with-base-path [routes
+                      root-uri]
+  (mapv (fn [[path & rest]]
+          (into [(str root-uri (when (.startsWith path "/")
+                                 (subs path 1)))]
+                rest))
+        routes))
+
 (def default-handler
   (let [encode-json (fn [status data]
                       {:status status
@@ -109,27 +122,33 @@
        :method-not-allowed (fn [_] (encode-json 405 {:error "method not allowed"}))
        :not-acceptable     (fn [_] (encode-json 406 {:error "not acceptable"}))})))
 
-(def app
-  (-> (ring/ring-handler
-        (ring/router
-          app-routes
-          {:data {:coercion reitit.coercion.spec/coercion
-                  :muuntaja m/instance
-                  :middleware [parameters/parameters-middleware
-                               muuntaja/format-middleware
-                               rrc/coerce-exceptions-middleware
-                               rrc/coerce-request-middleware
-                               rrc/coerce-response-middleware]}})
-        (ring/routes
-          (ring/redirect-trailing-slash-handler)
-          default-handler))
-      (resource/wrap-resource "public")))
+(defn app [root-uri]
+  (let [routes (with-base-path
+                 app-routes
+                 root-uri)]
+    (-> (ring/ring-handler
+          (ring/router
+            routes
+            {:data {:coercion reitit.coercion.spec/coercion
+                    :muuntaja m/instance
+                    :middleware [parameters/parameters-middleware
+                                 muuntaja/format-middleware
+                                 rrc/coerce-exceptions-middleware
+                                 rrc/coerce-request-middleware
+                                 rrc/coerce-response-middleware]}})
+          (ring/routes
+            (ring/redirect-trailing-slash-handler)
+            default-handler))
+        (resource/wrap-resource "public"))))
 
 (defn start-server [config]
-  (let [port (get-in config [:web :port] 4242)]
-    (log/info "starting baymax server on port" port)
-    (jetty/run-jetty #'app {:port port
-                            :join? false})))
+  (let [port (get-in config [:web :port] 4242)
+        root-uri (-> config
+                     (get-in [:web :root-uri] "/")
+                     make-base-path)]
+    (log/infof "starting baymax server on port %s, routable on root uri \"%s\"" port root-uri)
+    (jetty/run-jetty (app root-uri) {:port port
+                                     :join? false})))
 
 (defn stop-server [server]
   (log/info "stopping baymax server")

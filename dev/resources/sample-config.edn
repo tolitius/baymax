@@ -163,8 +163,7 @@
 
  :web
  {:port 4242
-  :auth {:user "admin"
-         :password-env "ADMIN_PASSWORD"}}
+  :root-uri "/"} ;; just for show. it would be "/" be default
 
  :logging
  {:level :info
