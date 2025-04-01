@@ -34,6 +34,8 @@ http://localhost:4242/intel-all
 ...
 ```
 
+![image](https://github.com/user-attachments/assets/b8eab038-ab42-441b-b998-8701f61ce649)
+
 or run it as an uberjar without docker..
 
 ### uberjar

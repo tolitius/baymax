@@ -2,6 +2,7 @@
   (:require [ring.adapter.jetty :as jetty]
             [ring.middleware.resource :as resource]
             [clojure.java.io :as io]
+            [clojure.string :as s]
             [reitit.ring :as ring]
             [reitit.core :as r]
             [reitit.coercion.spec]
@@ -20,7 +21,6 @@
   (let [collector-id (get-in request [:path-params :collector-id])
         format (get-in request [:path-params :format] "json")
         intel (registry/find-latest-intel collector-id)]
-
     (if intel
       (case format
         "json" {:status 200
@@ -37,7 +37,6 @@
 (defn all-intel-handler [request]
   (let [format (get-in request [:path-params :format] "json")
         all-intel (registry/find-all-intel)]
-
     (if (seq all-intel)
       (case format
         "json" {:status 200
@@ -65,7 +64,6 @@
         collector-status (->> (:schedules all-status)
                               (filter #(= collector-id (:id %)))
                               first)]
-
     (if collector-status
       {:status 200
        :body collector-status}
@@ -79,38 +77,26 @@
           :app "baymax"
           :timestamp (java.time.Instant/now)}})
 
-(defn home-handler [_]
-  {:status 200
-   :headers {"Content-Type" "text/html"}
-   :body (slurp (io/resource "public/index.html"))})
+(defn home-handler [request]
+  (let [root-uri (or (some-> (get-in request [:config :root-uri])
+                             (s/replace #"/$" ""))
+                     "")]
+    {:status 200
+     :headers {"Content-Type" "text/html"}
+     :body (-> (io/resource "public/index.html")
+               slurp
+               (s/replace #"ROOT_URI" root-uri))}))
 
 (def app-routes
   [["/" {:get home-handler}]
    ["/health" {:get health-handler}]
-
    ["/intel-all/:format" {:get all-intel-handler}]
    ["/intel-all" {:get all-intel-handler}]
-
    ["/intel/:collector-id/:format" {:get collector-intel-handler}]
    ["/intel/:collector-id" {:get collector-intel-handler}]
-
    ["/schedule/health" {:get schedule-health-handler}]
    ["/schedule/status" {:get schedule-status-handler}]
    ["/schedule/status/:collector-id" {:get collector-schedule-status-handler}]])
-
-
-(defn make-base-path [path]
-  (if (.endsWith path "/")
-    path
-    (str path "/")))
-
-(defn with-base-path [routes
-                      root-uri]
-  (mapv (fn [[path & rest]]
-          (into [(str root-uri (when (.startsWith path "/")
-                                 (subs path 1)))]
-                rest))
-        routes))
 
 (def default-handler
   (let [encode-json (fn [status data]
@@ -122,33 +108,33 @@
        :method-not-allowed (fn [_] (encode-json 405 {:error "method not allowed"}))
        :not-acceptable     (fn [_] (encode-json 406 {:error "not acceptable"}))})))
 
-(defn app [root-uri]
-  (let [routes (with-base-path
-                 app-routes
-                 root-uri)]
-    (-> (ring/ring-handler
-          (ring/router
-            routes
-            {:data {:coercion reitit.coercion.spec/coercion
-                    :muuntaja m/instance
-                    :middleware [parameters/parameters-middleware
-                                 muuntaja/format-middleware
-                                 rrc/coerce-exceptions-middleware
-                                 rrc/coerce-request-middleware
-                                 rrc/coerce-response-middleware]}})
-          (ring/routes
-            (ring/redirect-trailing-slash-handler)
-            default-handler))
-        (resource/wrap-resource "public"))))
+(defn wrap-config [handler config]
+  (fn [request]
+    (handler (assoc request :config config))))
+
+(defn app [config]
+  (-> (ring/ring-handler
+        (ring/router
+          app-routes
+          {:data {:coercion reitit.coercion.spec/coercion
+                  :muuntaja m/instance
+                  :middleware [parameters/parameters-middleware
+                               muuntaja/format-middleware
+                               rrc/coerce-exceptions-middleware
+                               rrc/coerce-request-middleware
+                               rrc/coerce-response-middleware]}})
+        (ring/routes
+          (ring/redirect-trailing-slash-handler)
+          default-handler))
+      (wrap-config config)
+      (resource/wrap-resource "public")))
 
 (defn start-server [config]
   (let [port (get-in config [:web :port] 4242)
-        root-uri (-> config
-                     (get-in [:web :root-uri] "/")
-                     make-base-path)]
+        root-uri (get-in config [:web :root-uri] "/")]
     (log/infof "starting baymax server on port %s, routable on root uri \"%s\"" port root-uri)
-    (jetty/run-jetty (app root-uri) {:port port
-                                     :join? false})))
+    (jetty/run-jetty (app (:web config)) {:port port
+                                          :join? false})))
 
 (defn stop-server [server]
   (log/info "stopping baymax server")
