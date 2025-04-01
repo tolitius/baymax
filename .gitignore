@@ -21,3 +21,5 @@ out/
 .DS_Store
 dev/config.edn
 .env
+src/ui/node_modules/**
+resources/public/js/**

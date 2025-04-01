@@ -12,9 +12,11 @@
             [muuntaja.core :as m]
             [mount.core :refer [defstate]]
             [baymax.config :as env]
+            [baymax.chip :as chip]
             [baymax.registry :as registry]
             [baymax.scheduler :as sch]
             [baymax.publisher.prometheus :as prometheus]
+            [baymax.source.proto :as source]
             [clojure.tools.logging :as log]))
 
 (defn collector-intel-handler [request]
@@ -77,6 +79,35 @@
           :app "baymax"
           :timestamp (java.time.Instant/now)}})
 
+
+(defn dashboard-handler [_]
+  (let [collectors (chip/chip :collectors)
+        sources    (chip/chip :sources)
+        publishers (chip/chip :publishers)
+        schedules (sch/find-schedules sch/scheduler)
+        uptime    (-> sch/scheduler sch/status :uptime)]
+    {:status 200
+     :body {:uptime uptime
+            :collectors {:count (count collectors)
+                         :items (map (fn [{:keys [id schedule source]}]
+                                       {:id id
+                                        :running? (-> (get schedules id)
+                                                      :running?)
+                                        :source source
+                                        :schedule schedule})
+                                     collectors)}
+            :sources {:count (count sources)
+                      :items (map (fn [[id source]]
+                                    {:id id
+                                     :type (-> source :config :type)
+                                     :health (source/health-check source)})
+                                  sources)}
+            :publishers {:count (count publishers)
+                         :items (map (fn [pub]
+                                       {:type (-> pub :config :type)
+                                        :collectors (-> pub :config :collectors)})
+                                     publishers)}}}))
+
 (defn home-handler [request]
   (let [root-uri (or (some-> (get-in request [:config :root-uri])
                              (s/replace #"/$" ""))
@@ -90,6 +121,7 @@
 (def app-routes
   [["/" {:get home-handler}]
    ["/health" {:get health-handler}]
+   ["/dashboard" {:get dashboard-handler}]
    ["/intel-all/:format" {:get all-intel-handler}]
    ["/intel-all" {:get all-intel-handler}]
    ["/intel/:collector-id/:format" {:get collector-intel-handler}]

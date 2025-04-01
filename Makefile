@@ -1,4 +1,4 @@
-.PHONY: clean jar tag image run outdated install deploy tree test repl
+.PHONY: clean jar ui tag image run outdated install deploy tree test repl
 
 clean:
 	rm -rf target
@@ -7,6 +7,9 @@ clean:
 jar: tag
 	rm -rf target && mkdir target
 	clojure -X:uberjar :jar target/baymax-standalone.jar :main-class baymax.app
+
+ui:
+	cd src/ui && npm install && npm run build
 
 outdated:
 	clojure -M:outdated

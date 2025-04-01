@@ -87,12 +87,17 @@
     ((:cancel schedule)))
   (log/info "all collector schedules are cancelled"))
 
+(defn find-schedules [scheduler]
+  (->> (for [{:keys [id] :as schedule} (-> scheduler status :schedules)]
+         [id (dissoc schedule :id)])
+       (into {})))
+
 (defn status
   "return the current status of all schedules"
   [{:keys [schedules started-at]}]
   (let [now (Instant/now)
         uptime (- (.toEpochMilli now) (.toEpochMilli started-at))
-        status (mapv (fn [[collector-id schedule]]
+        status (mapv (fn [[collector-id schedule]]                ;; later if collector ids are unique, this should be a map
                        (let [intel (:intel schedule)]
                          {:id collector-id
                           :running? ((:running? intel))

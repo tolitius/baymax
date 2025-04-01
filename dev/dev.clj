@@ -12,6 +12,7 @@
             [baymax.app :as app]
             [baymax.registry :as registry]
             [baymax.scheduler :as scheduler]
+            [baymax.source.proto :as source]
             [baymax.source.postgres :as pg]))
 
 (defn restart []
