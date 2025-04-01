@@ -1,8 +1,7 @@
 import { writable } from 'svelte/store';
 import type { DashboardIntel } from '../types/dashboard';
 
-// Default empty state
-const defaultData: DashboardIntel = {
+const defaultIntel: DashboardIntel = {
   uptime: '',
   collectors: { count: 0, items: [] },
   sources: { count: 0, items: [] },

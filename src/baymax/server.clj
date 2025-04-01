@@ -1,6 +1,7 @@
 (ns baymax.server
   (:require [ring.adapter.jetty :as jetty]
             [ring.middleware.resource :as resource]
+            [ring.middleware.content-type :as content-type]
             [clojure.java.io :as io]
             [clojure.string :as s]
             [reitit.ring :as ring]
@@ -159,7 +160,8 @@
           (ring/redirect-trailing-slash-handler)
           default-handler))
       (wrap-config config)
-      (resource/wrap-resource "public")))
+      (resource/wrap-resource "public")
+      (content-type/wrap-content-type)))
 
 (defn start-server [config]
   (let [port (get-in config [:web :port] 4242)
