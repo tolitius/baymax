@@ -92,6 +92,28 @@
          [id (dissoc schedule :id)])
        (into {})))
 
+
+(defn format-uptime
+  "format uptime in milliseconds into a human-readable string, omitting zero values"
+  [uptime-ms]
+  (let [days (quot uptime-ms (* 24 60 60 1000))
+        hours (quot (mod uptime-ms (* 24 60 60 1000)) (* 60 60 1000))
+        minutes (quot (mod uptime-ms (* 60 60 1000)) (* 60 1000))
+        seconds (quot (mod uptime-ms (* 60 1000)) 1000)
+
+        ;; pairs of [value unit] and filter out zero values
+        time-parts (->> [[(when (pos? days) days) "days"]
+                         [(when (pos? hours) hours) "hours"]
+                         [(when (pos? minutes) minutes) "minutes"]
+                         [(when (pos? seconds) seconds) "seconds"]]
+                        (filter (comp some? first)))]
+
+    (if (empty? time-parts)
+      "0 seconds"
+      (clojure.string/join " " (map (fn [[val unit]]
+                                      (str val " " unit))
+                                    time-parts)))))
+
 (defn status
   "return the current status of all schedules"
   [{:keys [schedules started-at]}]
@@ -111,11 +133,7 @@
     {:status "running"
      :started-at (format-instant started-at)
      :uptime-ms uptime
-     :uptime (format "%d days %d hours %d minutes %d seconds"
-                     (quot uptime (* 24 60 60 1000))
-                     (quot (mod uptime (* 24 60 60 1000)) (* 60 60 1000))
-                     (quot (mod uptime (* 60 60 1000)) (* 60 1000))
-                     (quot (mod uptime (* 60 1000)) 1000))
+     :uptime (format-uptime uptime)
      :schedules status}))
 
 (defn health
