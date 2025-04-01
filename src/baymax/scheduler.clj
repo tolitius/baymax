@@ -87,12 +87,6 @@
     ((:cancel schedule)))
   (log/info "all collector schedules are cancelled"))
 
-(defn find-schedules [scheduler]
-  (->> (for [{:keys [id] :as schedule} (-> scheduler status :schedules)]
-         [id (dissoc schedule :id)])
-       (into {})))
-
-
 (defn format-uptime
   "format uptime in milliseconds into a human-readable string, omitting zero values"
   [uptime-ms]
@@ -135,6 +129,11 @@
      :uptime-ms uptime
      :uptime (format-uptime uptime)
      :schedules status}))
+
+(defn find-schedules [scheduler]
+  (->> (for [{:keys [id] :as schedule} (-> scheduler status :schedules)]
+         [id (dissoc schedule :id)])
+       (into {})))
 
 (defn health
   "check health of all scheduled collectors"

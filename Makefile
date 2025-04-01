@@ -4,12 +4,12 @@ clean:
 	rm -rf target
 	rm -rf .env
 
-jar: tag
-	rm -rf target && mkdir target
-	clojure -X:uberjar :jar target/baymax-standalone.jar :main-class baymax.app
-
 ui:
 	cd src/ui && npm install && npm run build
+
+jar: tag ui
+	rm -rf target && mkdir target
+	clojure -X:uberjar :jar target/baymax-standalone.jar :main-class baymax.app
 
 outdated:
 	clojure -M:outdated
