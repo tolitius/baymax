@@ -30,6 +30,11 @@
             box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
         }
     </style>
+    <script>
+        window.BAYMAX_CONFIG = {
+            rootUri: 'ROOT_URI'
+        };
+    </script>
 </head>
 <body class="bg-baymax min-h-screen flex flex-col">
     <header class="bg-white shadow-md">
@@ -78,7 +83,7 @@
                     <div class="flex justify-between items-center">
                         <div>
                             <p class="text-sm text-gray-600">Active Collectors</p>
-                            <p class="text-xl font-semibold">4 / 4</p>
+                            <p id="collectors-count" class="text-xl font-semibold">loading...</p>
                         </div>
                         <i class="fas fa-chart-line text-2xl text-green-500"></i>
                     </div>
@@ -87,7 +92,7 @@
                     <div class="flex justify-between items-center">
                         <div>
                             <p class="text-sm text-gray-600">Healthy Sources</p>
-                            <p class="text-xl font-semibold">1 / 1</p>
+                            <p id="sources-count" class="text-xl font-semibold">loading...</p>
                         </div>
                         <i class="fas fa-database text-2xl text-purple-500"></i>
                     </div>
