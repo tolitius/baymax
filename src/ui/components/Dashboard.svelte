@@ -33,7 +33,7 @@
     <div class="container mx-auto px-4">
       <div class="flex flex-col md:flex-row justify-between items-center">
         <div class="mb-4 md:mb-0">
-          <p class="text-sm text-gray-600">baymax © {currentYear}</p>
+          <p class="text-sm text-gray-600">tolitius © {currentYear}</p>
         </div>
       </div>
     </div>

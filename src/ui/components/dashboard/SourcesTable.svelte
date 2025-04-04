@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { dashboardStore } from '../../stores/dashboard';
   import StatusBadge from '../shared/StatusBadge.svelte';
-  import { getSourceTypeIcon } from '../../lib/utils';
+  import { findSourceTypeIcon } from '../../lib/utils';
 
   let sources = [];
 
@@ -37,7 +37,7 @@
       <tbody>
         {#if sources.length > 0}
           {#each sources as source}
-            {@const typeInfo = getSourceTypeIcon(source.type)}
+            {@const typeInfo = findSourceTypeIcon(source.type)}
             <tr>
               <td class="px-4 py-3 text-sm text-gray-900">{source.id}</td>
               <td class="px-4 py-3 text-sm text-gray-500">

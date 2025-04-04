@@ -13,7 +13,7 @@ export function buildUrl(path: string): string {
 /**
  * source type => icon
  */
-export function getSourceTypeIcon(type: string): { icon: string, color: string, label: string } {
+export function findSourceTypeIcon(type: string): { icon: string, color: string, label: string } {
   switch (type) {
     case 'postgres':
       return {
