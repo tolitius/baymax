@@ -13,8 +13,10 @@
 
         collectors (:collectors config)
 
-        publishers (mapv publisher/make-publisher
-                         (:publishers config))]
+        publishers (reduce-kv (fn [acc id pconfig]
+                                (assoc acc id (publisher/make-publisher pconfig)))
+                              {}
+                              (:publishers config))]
     {:sources sources
      :collectors collectors
      :publishers publishers
@@ -29,11 +31,12 @@
 (defn find-publishers
   "find all publishers that this collector in their list"
   [chip cid]
-  (filter #(some->> %
-                    :config
-                    :collectors
-                    (some #{cid}))
-          (:publishers chip)))
+  (->> (:publishers chip)
+       vals
+       (filter #(some->> %
+                         :config
+                         :collectors
+                         (some #{cid})))))
 
 (defstate chip :start (flash env/config)
                :stop  :unplugged)

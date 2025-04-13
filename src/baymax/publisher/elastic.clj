@@ -25,7 +25,7 @@
                              timestamped-intel)]
     (str (clojure.string/join "\n" bulk-actions) "\n")))
 
-(defn bulk-index [url auth-headers index intel]
+(defn store-bulk [url auth-headers index intel]
   (let [bulk (make-bulk index intel)
         endpoint (str url "/_bulk")
         response (http/post endpoint
@@ -43,17 +43,21 @@
 
 (defrecord ElasticsearchPublisher [config]
   Publisher
-  (publish [this intel]
-    (let [{:keys [url auth-type username password api-key token index]} config
+  (publish [this collector-id intel]
+    (let [{:keys [url auth-type username password api-key token index-prefix]} config
           auth-headers (case auth-type
                          :basic {"Authorization" (str "Basic "
                                                       (javax.xml.bind.DatatypeConverter/printBase64Binary
                                                         (.getBytes (str username ":" password))))}
                          :api-key {"Authorization" (str "ApiKey " api-key)}
                          :token {"Authorization" (str "Bearer " token)}
-                         {})]
+                         {})
+          index (str index-prefix "-" collector-id)]
       (try
-        (let [result (bulk-index url auth-headers index intel)]
+        (let [result (store-bulk url
+                                 auth-headers
+                                 index
+                                 intel)]
           {:published (count intel)
            :errors (get result "errors")
            :took (get result "took")

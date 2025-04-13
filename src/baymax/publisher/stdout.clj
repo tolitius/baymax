@@ -4,20 +4,22 @@
             [clojure.pprint :as pp]
             [clojure.tools.logging :as log]))
 
-(defn print-intel-atomically [intel at]
+(defn print-intel-atomically [collector-id intel at]
   (locking *out*
-    (println "\n================= intel ==================== |" at)
+    (println "\n================= intel ==================== |" collector-id "|" at)
     (clojure.pprint/pprint intel)
     (println "============================================")))
 
 (defrecord StdoutPublisher [config]
   Publisher
-  (publish [this intel]
+  (publish [this collector-id intel]
     (let [timestamp (java.time.LocalDateTime/now)
           formatter (java.time.format.DateTimeFormatter/ofPattern "yyyy-MM-dd HH:mm:ss")
           formatted-time (.format timestamp formatter)]
 
-      (print-intel-atomically intel formatted-time)
+      (print-intel-atomically collector-id
+                              intel
+                              formatted-time)
 
       {:published (count intel)
        :timestamp formatted-time}))

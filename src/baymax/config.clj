@@ -79,12 +79,13 @@
 (defn- validate-publishers
   "validate that all collectors referenced by publishers exist"
   [config]
-  (doseq [publisher (:publishers config)]
+  (doseq [[id publisher] (:publishers config)]
     (let [publisher-collectors (get publisher :collectors [])]
       (doseq [collector-id publisher-collectors]
         (when-not (find-collector config collector-id)
           (throw (ex-info (str "publisher references non-existent collector: " collector-id)
-                          {:publisher-type (:type publisher)
+                          {:publisher-id id
+                           :publisher-type (:type publisher)
                            :collector-id collector-id}))))))
   config)
 
