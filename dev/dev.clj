@@ -13,7 +13,10 @@
             [baymax.registry :as registry]
             [baymax.scheduler :as scheduler]
             [baymax.source.proto :as source]
-            [baymax.source.postgres :as pg]))
+            [baymax.source.postgres :as pg]
+            [baymax.publisher.proto :as publisher]
+            [baymax.publisher.elastic :as elastic]
+            ))
 
 (defn restart []
   (mount/stop)

@@ -7,9 +7,9 @@
 
 (defn make-publisher [config]
   (case (:type config)
-    :prometheus (prometheus/make-publisher config)
-    :elastic    (elastic/make-publisher config)
-    :stdout     (stdout/make-publisher config)
-    ; :influxdb (influxdb/make-publisher config)
+    :prometheus                   (prometheus/make-publisher config)
+    (:elastic :elasticsearch)     (elastic/make-publisher config)
+    :stdout                       (stdout/make-publisher config)
+    ;; :influxdb                     (influxdb/make-publisher config)
     (throw (ex-info "unknown publisher type" {:config config
-                                              :supported-types [:prometheus :stdout]}))))
+                                              :supported-types [:prometheus :elastic :stdout]}))))
