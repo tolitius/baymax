@@ -45,9 +45,11 @@
       (case format
         "json" {:status 200
                 :body all-intel}
-        "prometheus" {:status 200
-                      :headers {"Content-Type" "text/plain; version=0.0.4"}
-                      :body (prometheus/format-all-metrics all-intel)}
+        "prometheus" (let [intel (-> (chip/find-prometheus-collectors chip/chip)
+                                     registry/find-by-collector-ids)]
+                       {:status 200
+                        :headers {"Content-Type" "text/plain; version=0.0.4"}
+                        :body (prometheus/format-all-metrics intel)})
         {:status 400
          :body {:error (str "unsupported format: " format)}})
       {:status 200

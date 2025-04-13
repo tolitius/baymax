@@ -20,3 +20,13 @@
 (defn find-all-intel []
   (into {} (for [[k v] store]
              [k v])))
+
+(defn find-by-collector-ids
+  "find intel for a collection of collector ids"
+  [collector-ids]
+  (let [ids-set (if (set? collector-ids)
+                  collector-ids
+                  (into #{} collector-ids))]
+    (into {} (for [[k v] store
+                   :when (contains? ids-set k)]
+               [k v]))))

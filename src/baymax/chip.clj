@@ -28,6 +28,16 @@
             collector))
         (:collectors chip)))
 
+(defn find-prometheus-collectors
+  "find all collector ids that are associated with prometheus publishers"
+  [chip]
+  (->> (:publishers chip)
+       (filter (fn [[_ publisher]]
+                 (= :prometheus (get-in publisher [:config :type]))))
+       (mapcat (fn [[_ publisher]]
+                 (get-in publisher [:config :collectors])))
+       (into #{})))
+
 (defn find-publishers
   "find all publishers that this collector in their list"
   [chip cid]
