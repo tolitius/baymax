@@ -18,6 +18,7 @@
             [baymax.scheduler :as sch]
             [baymax.publisher.prometheus :as prometheus]
             [baymax.source.proto :as source]
+            [baymax.publisher.proto :as publisher]
             [clojure.tools.logging :as log]))
 
 (defn collector-intel-handler [request]
@@ -104,9 +105,10 @@
                                      :health (source/health-check source)})
                                   sources)}
             :publishers {:count (count publishers)
-                         :items (map (fn [pub]
-                                       {:type (-> pub :config :type)
-                                        :collectors (-> pub :config :collectors)})
+                         :items (map (fn [[id pub]]
+                                       {:id id
+                                        :type (-> pub :config :type)
+                                        :health (publisher/health-check pub)})
                                      publishers)}}}))
 
 (defn home-handler [request]
