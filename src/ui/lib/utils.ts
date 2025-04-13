@@ -43,6 +43,39 @@ export function findSourceTypeIcon(type: string): { icon: string, color: string,
 }
 
 /**
+ * publisher type => icon
+ */
+export function findPublisherTypeIcon(type: string): { icon: string, color: string, label: string } {
+  switch (type) {
+    case 'prometheus':
+      return {
+        icon: 'fas fa-chart-line',
+        color: 'text-orange-500',
+        label: 'Prometheus'
+      };
+    case 'elasticsearch':
+    case 'elastic':
+      return {
+        icon: 'fas fa-search',
+        color: 'text-yellow-500',
+        label: 'Elasticsearch'
+      };
+    case 'stdout':
+      return {
+        icon: 'fas fa-terminal',
+        color: 'text-gray-500',
+        label: 'Stdout'
+      };
+    default:
+      return {
+        icon: 'fas fa-question-circle',
+        color: 'text-gray-500',
+        label: type
+      };
+  }
+}
+
+/**
  * format a value with its label
  */
 export function formatMetricValue(value: number, total: number): string {

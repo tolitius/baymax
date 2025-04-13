@@ -108,6 +108,7 @@
                          :items (map (fn [[id pub]]
                                        {:id id
                                         :type (-> pub :config :type)
+                                        :collectors (-> pub :config :collectors)
                                         :health (publisher/health-check pub)})
                                      publishers)}}}))
 

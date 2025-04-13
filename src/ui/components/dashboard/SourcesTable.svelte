@@ -19,7 +19,7 @@
   });
 </script>
 
-<div class="bg-white rounded-lg shadow-md p-6">
+<div class="bg-white rounded-lg shadow-md p-6 mb-8">
   <div class="flex justify-between items-center mb-4">
     <h2 class="text-xl font-semibold text-gray-800">Data Sources</h2>
   </div>

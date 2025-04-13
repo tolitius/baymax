@@ -4,6 +4,7 @@
   import NavigationCards from './dashboard/NavigationCards.svelte';
   import CollectorsTable from './dashboard/CollectorsTable.svelte';
   import SourcesTable from './dashboard/SourcesTable.svelte';
+  import PublishersTable from './dashboard/PublishersTable.svelte';
 
   const rootUri = window.BAYMAX_CONFIG?.rootUri || '/';
   const currentYear = new Date().getFullYear();
@@ -27,6 +28,7 @@
     <NavigationCards />
     <CollectorsTable />
     <SourcesTable />
+    <PublishersTable />
   </main>
 
   <footer class="bg-white shadow-md mt-8 py-6">
