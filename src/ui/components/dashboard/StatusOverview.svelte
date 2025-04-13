@@ -78,7 +78,7 @@
       title="Healthy Publishers"
       value={publishersValue}
       icon="fas fa-paper-plane"
-      color="orange"
+      color="amber"
     />
   </div>
 </div>

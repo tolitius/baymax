@@ -25,6 +25,11 @@
       border: 'border-orange-200',
       text: 'text-orange-500'
     },
+    amber: {
+      bg: 'bg-yellow-50',
+      border: 'border-yellow-200',
+      text: 'text-yellow-600'
+    },
     red: {
       bg: 'bg-red-50',
       border: 'border-red-200',
