@@ -40,8 +40,8 @@
           ;; publish intel to all associated publishers
           (doseq [pub publishers]
             (try
-              (log/debug "publishing intel from" collector-id "to" (-> pub :config :type))
-              (log/debug (publisher/publish pub
+              (log/info "publishing intel from" collector-id "to" (-> pub :config :type))
+              (log/info (publisher/publish pub
                                             collector-id
                                             intel))
 
