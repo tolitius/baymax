@@ -141,10 +141,15 @@
   "check health of all scheduled collectors"
   [{:keys [schedules chip]}]
   (let [sources (:sources chip)
+        publishers (:publishers chip)
         source-health (reduce-kv (fn [acc id source]
                                    (assoc acc id (source/health-check source)))
                                  {}
                                  sources)
+        publisher-health (reduce-kv (fn [acc id publisher]
+                                       (assoc acc id (publisher/health-check publisher)))
+                                     {}
+                                     publishers)
         collector-health (reduce (fn [acc [collector-id schedule]]
                                    (let [intel (:intel schedule)
                                          collector (get-in chip [:collectors collector-id])
@@ -160,9 +165,11 @@
                                  schedules)]
 
     {:sources source-health
+     :publishers publisher-health
      :collectors collector-health
      :healthy? (and (every? (fn [[_ status]] (:healthy status)) source-health)
-                   (every? (fn [[_ status]] (:running? status)) collector-health))}))
+                    (every? (fn [[_ status]] (:healthy status)) publisher-health)
+                    (every? (fn [[_ status]] (:running? status)) collector-health))}))
 
 (defstate scheduler :start (start cp/chip)
                     :stop  (stop scheduler))

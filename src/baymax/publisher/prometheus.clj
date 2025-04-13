@@ -5,8 +5,22 @@
   (:import [io.prometheus.client Gauge GaugeMetricFamily CollectorRegistry Collector SimpleCollector]
            [io.prometheus.client.exporter.common TextFormat]))
 
+(defrecord PrometheusPublisher [config]
+  Publisher
+  (publish [this collector-id intel]
+    :to-implement)
+
+  (health-check [this]
+    {:healthy true
+     :status "to be implemented"
+     :message "stdout is 6 feet above"})
+
+  (disconnect [this]
+    {:status "disconnected"}))
+
 (defn make-publisher [config]
-  :to-implement)
+  (log/info "making prometheus publisher")
+  (->PrometheusPublisher config))
 
 (defn name->prometheus [metric-name]
   (-> (if (keyword? metric-name)
