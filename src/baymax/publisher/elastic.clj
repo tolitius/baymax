@@ -25,7 +25,10 @@
                              timestamped-intel)]
     (str (clojure.string/join "\n" bulk-actions) "\n")))
 
-(defn store-bulk [url auth-headers index intel]
+(defn store-bulk [url
+                  auth-headers
+                  index
+                  intel]
   (let [bulk (make-bulk index intel)
         endpoint (str url "/_bulk")
         response (http/post endpoint
@@ -41,10 +44,54 @@
                        :body (:body response)})))
     (json/read-value (:body response) mapper)))
 
+(defn delete-all-docs [url
+                       auth-headers
+                       index]
+  (try
+    ;; check if the index exists
+    (let [index-exists-endpoint (str url "/" index)
+          exists-response (http/head index-exists-endpoint
+                                    {:headers auth-headers
+                                     :throw-exceptions false})]
+
+      ;; if index exists (status 200), perform delete by query
+      (if (= 200 (:status exists-response))
+        (let [endpoint (str url "/" index "/_delete_by_query?wait_for_completion=true&refresh=true")
+              query {:query {:match_all {}}}
+              response (http/post endpoint
+                                 {:body (serialize query)
+                                  :headers (merge {"Content-Type" "application/json"}
+                                                 auth-headers)})]
+          (when-not (<= 200 (:status response) 299)
+            (throw (ex-info "delete by query failed"
+                           {:status (:status response)
+                            :body (:body response)})))
+
+          ;; force a refresh to ensure deletion is complete
+          (http/post (str url "/" index "/_refresh")
+                     {:headers (merge {"Content-Type" "application/json"}
+                                      auth-headers)})
+
+          (json/read-value (:body response) mapper))
+
+        ;; if index doesn't exist
+        {:deleted 0 :result "index_not_found"}))
+
+    (catch Exception e
+      (log/error e "error during delete operation")
+      (throw e))))
+
 (defrecord ElasticsearchPublisher [config]
   Publisher
   (publish [this collector-id intel]
-    (let [{:keys [url auth-type username password api-key token index-prefix]} config
+    (let [{:keys [url
+                  auth-type
+                  username
+                  password
+                  api-key
+                  token
+                  index-prefix
+                  accrete]}    config
           auth-headers (case auth-type
                          :basic {"Authorization" (str "Basic "
                                                       (javax.xml.bind.DatatypeConverter/printBase64Binary
@@ -54,6 +101,11 @@
                          {})
           index (str index-prefix "-" collector-id)]
       (try
+
+        (when-not accrete
+          (log/info "deleting all documents from index" index "before indexing")
+          (log/info (delete-all-docs url auth-headers index)))
+
         (let [result (store-bulk url
                                  auth-headers
                                  index

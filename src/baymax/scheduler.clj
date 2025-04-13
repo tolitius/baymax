@@ -41,9 +41,10 @@
           (doseq [pub publishers]
             (try
               (log/debug "publishing intel from" collector-id "to" (-> pub :config :type))
-              (publisher/publish pub
-                                 collector-id
-                                 intel)
+              (log/debug (publisher/publish pub
+                                            collector-id
+                                            intel))
+
               (catch Exception e
                 (log/error "could not publish intel for" collector-id "to" (-> pub :config :type) "due to" (.getMessage e))))))
 
