@@ -51,6 +51,27 @@
     }
   }
 
+  async function collectNow(collectorId) {
+    try {
+      const response = await fetch(`${rootUri}collector/collect/${collectorId}`, {
+        method: 'POST'
+      });
+
+      if (!response.ok) {
+        throw new Error(`failed to trigger collection: ${response.status}`);
+      }
+
+      const result = await response.json();
+      alert(`collected intel for ${collectorId}`);
+
+      // refresh schedule data to update ui
+      await fetchScheduleStatus();
+    } catch (error) {
+      console.error('error triggering collection:', error);
+      alert(`failed to trigger collection: ${error.message}`);
+    }
+  }
+
   onMount(() => {
     fetchScheduleStatus();
 
@@ -71,7 +92,7 @@
   <div class="flex justify-between items-center mb-4">
     <h2 class="text-xl font-semibold text-gray-800">Collectors</h2>
     <a href="{rootUri}intel-all" class="text-baymax-primary hover:underline text-sm">
-      <span>View all intel</span>
+      <span>view all intel</span>
       <i class="fas fa-arrow-right ml-1"></i>
     </a>
   </div>
@@ -106,15 +127,26 @@
                 <StatusBadge status={collector.running ? 'active' : 'inactive'} size="sm" />
               </td>
               <td class="px-4 py-3 text-sm">
-                <a href="{rootUri}intel/{collector.id}" class="text-baymax-primary hover:underline mr-2">View Intel</a>
-                <a href="{rootUri}schedule/status/{collector.id}" class="text-gray-500 hover:underline">Schedule</a>
+                <div class="flex space-x-3">
+                  <a href="{rootUri}intel/{collector.id}" class="text-blue-500 hover:text-blue-700" title="View Intel">
+                    <i class="fas fa-chart-bar"></i>
+                  </a>
+                  <a href="{rootUri}schedule/status/{collector.id}" class="text-gray-500 hover:text-gray-700" title="View Schedule">
+                    <i class="fas fa-calendar-alt"></i>
+                  </a>
+                  <button on:click={() => collectNow(collector.id)}
+                          class="text-green-500 hover:text-green-700"
+                          title="collect now">
+                          <i class="fas fa-play-circle"></i>
+                  </button>
+                </div>
               </td>
             </tr>
           {/each}
         {:else}
           <tr>
             <td colspan="6" class="px-4 py-3 text-sm text-gray-500 text-center">
-              No collectors available or data is loading...
+              no collectors available or data is loading...
             </td>
           </tr>
         {/if}

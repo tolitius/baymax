@@ -38,6 +38,17 @@
       {:status 404
        :body {:error (str "no intel found for collector: " collector-id)}})))
 
+(defn trigger-collection-handler [request]
+  (let [collector-id (get-in request [:path-params :collector-id])]
+    (try
+      (let [result (sch/collect (:chip sch/scheduler) collector-id)]
+        {:status 200
+         :body result})
+      (catch Exception e
+        {:status 500
+         :body {:error (.getMessage e)
+                :collector-id collector-id}}))))
+
 (defn all-intel-handler [request]
   (let [format (get-in request [:path-params :format] "json")
         all-intel (registry/find-all-intel)]
@@ -132,6 +143,7 @@
    ["/intel-all" {:get all-intel-handler}]
    ["/intel/:collector-id/:format" {:get collector-intel-handler}]
    ["/intel/:collector-id" {:get collector-intel-handler}]
+   ["/collector/collect/:collector-id" {:post trigger-collection-handler}]
    ["/schedule/health" {:get schedule-health-handler}]
    ["/schedule/status" {:get schedule-status-handler}]
    ["/schedule/status/:collector-id" {:get collector-schedule-status-handler}]])
