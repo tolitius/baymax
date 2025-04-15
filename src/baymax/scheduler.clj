@@ -90,26 +90,31 @@
     ((:cancel schedule)))
   (log/info "all collector schedules are cancelled"))
 
-(defn format-uptime
-  "format uptime in milliseconds into a human-readable string, omitting zero values"
-  [uptime-ms]
-  (let [days (quot uptime-ms (* 24 60 60 1000))
-        hours (quot (mod uptime-ms (* 24 60 60 1000)) (* 60 60 1000))
-        minutes (quot (mod uptime-ms (* 60 60 1000)) (* 60 1000))
-        seconds (quot (mod uptime-ms (* 60 1000)) 1000)
+(defn time->human
+  "format time in milliseconds into a human-readable string, omitting zero values"
+  ([duration] ;; in milliseconds
+   (time->human duration :seconds))
+  ([duration precision]
+   (let [days (quot duration (* 24 60 60 1000))
+         hours (quot (mod duration (* 24 60 60 1000)) (* 60 60 1000))
+         minutes (quot (mod duration (* 60 60 1000)) (* 60 1000))
+         seconds (quot (mod duration (* 60 1000)) 1000)
+         milliseconds (mod duration 1000)
 
-        ;; pairs of [value unit] and filter out zero values
-        time-parts (->> [[(when (pos? days) days) "days"]
-                         [(when (pos? hours) hours) "hours"]
-                         [(when (pos? minutes) minutes) "minutes"]
-                         [(when (pos? seconds) seconds) "seconds"]]
-                        (filter (comp some? first)))]
+         ;; pairs of [value unit] and filter out zero values
+         time-parts (->> [[(when (pos? days) days) "days"]
+                          [(when (pos? hours) hours) "hours"]
+                          [(when (pos? minutes) minutes) "minutes"]
+                          [(when (pos? seconds) seconds) "seconds"]
+                          [(when (and (pos? duration)
+                                      (= precision :ms)) milliseconds) "milliseconds"]]
+                         (filter (comp some? first)))]
 
-    (if (empty? time-parts)
-      "0 seconds"
-      (clojure.string/join " " (map (fn [[val unit]]
-                                      (str val " " unit))
-                                    time-parts)))))
+     (if (empty? time-parts)
+       "0 seconds"
+       (clojure.string/join " " (map (fn [[val unit]]
+                                       (str val " " unit))
+                                     time-parts))))))
 
 (defn status
   "return the current status of all schedules"
@@ -130,7 +135,7 @@
     {:status "running"
      :started-at (format-instant started-at)
      :uptime-ms uptime
-     :uptime (format-uptime uptime)
+     :uptime (time->human uptime)
      :schedules status}))
 
 (defn find-schedules [scheduler]
@@ -180,9 +185,13 @@
   "manually trigger collection for a specific collector"
   [chip collector-id]
   (let [task (create-collector-task chip
-                                    collector-id)]
+                                   collector-id)
+        start-time (System/currentTimeMillis)]
     (log/info "manually triggering collection for" collector-id)
     (task)
-    {:status "completed"
-     :collector-id collector-id
-     :timestamp (format-instant (Instant/now))}))
+    (let [duration (- (System/currentTimeMillis) start-time)]
+      {:status "completed"
+       :collector-id collector-id
+       :duration (time->human duration :ms)
+       :publishers (mapv #(-> % :config :type) (cp/find-publishers chip collector-id))
+       :timestamp (format-instant (Instant/now))})))

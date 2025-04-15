@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { dashboardStore } from '../../stores/dashboard';
   import StatusBadge from '../shared/StatusBadge.svelte';
+  import CollectionResultModal from './CollectionResultModal.svelte';
 
   // root uri from the global config
   const rootUri = window.BAYMAX_CONFIG?.rootUri || '/';
@@ -10,9 +11,15 @@
   let scheduleInfo = {};
   let isLoading = true;
 
+  // add these new state variables for the modal
+  let showResultModal = false;
+  let collectionResult = null;
+
+  // add a state variable to track which collector is currently being collected
+  let collectingId = null;
+
   const unsubscribe = dashboardStore.subscribe(data => {
     if (data.collectors?.items) {
-
       // "running?" has a question mark in the key, needs care
       collectors = data.collectors.items.map(collector => ({
         ...collector,
@@ -53,6 +60,9 @@
 
   async function collectNow(collectorId) {
     try {
+      // set the collecting state to show the spinner
+      collectingId = collectorId;
+
       const response = await fetch(`${rootUri}collector/collect/${collectorId}`, {
         method: 'POST'
       });
@@ -62,13 +72,29 @@
       }
 
       const result = await response.json();
-      alert(`collected intel for ${collectorId}`);
+
+      // show the result in the modal instead of an alert
+      collectionResult = result;
+      showResultModal = true;
 
       // refresh schedule data to update ui
       await fetchScheduleStatus();
     } catch (error) {
       console.error('error triggering collection:', error);
-      alert(`failed to trigger collection: ${error.message}`);
+
+      // show error in the modal
+      collectionResult = {
+        status: 'error',
+        'collector-id': collectorId,
+        duration: 'N/A',
+        publishers: [],
+        timestamp: new Date().toLocaleString(),
+        error: error.message
+      };
+      showResultModal = true;
+    } finally {
+      // reset collecting state to restore the original icon
+      collectingId = null;
     }
   }
 
@@ -87,6 +113,9 @@
     return scheduleInfo[collectorId]?.nextRun || 'Unknown';
   }
 </script>
+
+<!-- add the modal component -->
+<CollectionResultModal bind:show={showResultModal} result={collectionResult} />
 
 <div class="bg-white rounded-lg shadow-md p-6 mb-8">
   <div class="flex justify-between items-center mb-4">
@@ -134,10 +163,17 @@
                   <a href="{rootUri}schedule/status/{collector.id}" class="text-gray-500 hover:text-gray-700" title="View Schedule">
                     <i class="fas fa-calendar-alt"></i>
                   </a>
-                  <button on:click={() => collectNow(collector.id)}
-                          class="text-green-500 hover:text-green-700"
-                          title="collect now">
-                          <i class="fas fa-play-circle"></i>
+                  <button
+                    on:click={() => collectNow(collector.id)}
+                    class="text-green-500 hover:text-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50 rounded-full"
+                    title="Collect now"
+                    aria-label="Collect now for {collector.id}"
+                  >
+                    {#if collectingId === collector.id}
+                      <i class="fas fa-spinner fa-spin"></i>
+                    {:else}
+                      <i class="fas fa-play-circle"></i>
+                    {/if}
                   </button>
                 </div>
               </td>
