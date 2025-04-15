@@ -93,8 +93,10 @@
 (defn time->human
   "format time in milliseconds into a human-readable string, omitting zero values"
   ([duration] ;; in milliseconds
-   (time->human duration :seconds))
-  ([duration precision]
+   (time->human duration {}))
+  ([duration {:keys [precision max-parts]
+                     :or {precision :seconds
+                          max-parts 5}}]
    (let [days (quot duration (* 24 60 60 1000))
          hours (quot (mod duration (* 24 60 60 1000)) (* 60 60 1000))
          minutes (quot (mod duration (* 60 60 1000)) (* 60 1000))
@@ -108,7 +110,8 @@
                           [(when (pos? seconds) seconds) "seconds"]
                           [(when (and (pos? duration)
                                       (= precision :ms)) milliseconds) "milliseconds"]]
-                         (filter (comp some? first)))]
+                         (filter (comp some? first))
+                         (take max-parts))]
 
      (if (empty? time-parts)
        "0 seconds"
@@ -135,7 +138,8 @@
     {:status "running"
      :started-at (format-instant started-at)
      :uptime-ms uptime
-     :uptime (time->human uptime)
+     :uptime (time->human uptime
+                          {:max-parts 2})
      :schedules status}))
 
 (defn find-schedules [scheduler]
@@ -192,6 +196,7 @@
     (let [duration (- (System/currentTimeMillis) start-time)]
       {:status "completed"
        :collector-id collector-id
-       :duration (time->human duration :ms)
+       :duration (time->human duration
+                              {:precision :ms})
        :publishers (mapv #(-> % :config :type) (cp/find-publishers chip collector-id))
        :timestamp (format-instant (Instant/now))})))
