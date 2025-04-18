@@ -1,0 +1,88 @@
+{:sources
+ {:deep-space-db
+  {:type :postgres
+   :connection {:host "localhost"
+                :port 5432
+                :database "deep_space_telemetry"
+                :user "telemetry_reader"
+                :password "starsecret"}
+   :pool {:maximum-pool-size 5
+          :minimum-idle 1}
+   :trusted true}}
+
+ :collectors
+ [
+  ;; voyager spacecraft health metrics (simple count query)
+  {:id "voyager-health"
+   :source :deep-space-db
+   :schedule "5m"
+   :query "select count(*)
+           from telemetry.spacecraft_health
+           where spacecraft_id like 'VOYAGER%'
+             and timestamp > now() - interval '24 hours'"
+   :transform "(fn [rows]
+                 [{:name \"spacecraft.voyager.signals\"
+                   :value (-> rows first :count)
+                   :labels {:craft \"voyager\"
+                            :metric_type \"signal_count\"}}])"}
+
+  ;; James Webb telescope observations (document-style, using identity transform)
+  {:id "james-webb-intel"
+   :source :deep-space-db
+   :schedule "15m"
+   :query "select
+             id,
+             target_name,
+             observation_type,
+             wavelength_band,
+             signal_strength,
+             instrument,
+             observation_duration,
+             timestamp,
+             scientist_notes
+           from telemetry.cosmic_observations
+           where instrument_id = 'JWST'
+             and timestamp > now() - interval '48 hours'"
+   :transform "identity"}  ;; pass through the document as-is
+
+  ;; Parker Solar Probe heat shield data
+  {:id "parker-shield"
+   :source :deep-space-db
+   :schedule "1m"
+   :query "select
+             shield_section,
+             avg(temperature) as avg_temp,
+             max(temperature) as max_temp
+           from telemetry.thermal_protection
+           where spacecraft_id = 'PARKER'
+             and timestamp > now() - interval '1 hour'
+           group by shield_section"
+   :transform "(fn [rows]
+                 (mapcat (fn [{:keys [shield_section avg_temp max_temp]}]
+                           [{:name \"parker.shield.avg_temp\"
+                             :value avg_temp
+                             :labels {:section shield_section}}
+                            {:name \"parker.shield.max_temp\"
+                             :value max_temp
+                             :labels {:section shield_section}}])
+                         rows))"}]
+
+ :publishers
+  {:elasticsearch {:type :elasticsearch
+                   :url "http://localhost:9200"
+                   :auth-type :basic
+                   :username "elastic"
+                   :password "hush-hush"
+                   :index-prefix "space"
+                   :collectors ["james-webb-intel"]}
+
+   :stdout {:type :stdout
+            :pretty-print true
+            :collectors ["voyager-health", "james-webb-intel", "parker-shield"]}}
+
+ :scheduler
+ {:default-interval "5m"
+  :thread-pool-size 3}
+
+ :web
+ {:port 4242}}

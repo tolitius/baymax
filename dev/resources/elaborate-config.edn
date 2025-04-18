@@ -1,0 +1,187 @@
+{:sources
+ {:solar-system-db
+  {:type :postgres
+   :connection {:host "db.example.com"
+                :port 5432
+                :database "cosmos"
+                :user "astro_reader"
+                :password "super-secret"}
+   :pool {:maximum-pool-size 10
+          :minimum-idle 2}
+   :trusted true}
+
+  :galaxy-db
+  {:type :postgres
+   :connection {:host "analytics.example.com"
+                :port 5432
+                :database "galaxy"
+                :user "readonly"
+                :password "OVERRIDE_ME"}
+   :trusted true}
+
+  :telescope-api
+  {:type :http
+   :base-url "https://api.telescope.example.com"
+   :headers {"Authorization" "Bearer ${API_TOKEN}"}
+   :trusted true}
+
+  :observatory-jmx
+  {:type :jmx
+   :connection {:host "observatory.example.com"
+                :port 1099}
+   :trusted true}}
+
+ :collectors
+ [
+  ;; planet metrics from solar system database
+
+  {:id "planet-metrics"
+   :source :solar-system-db
+   :schedule "1m"
+   :query "select p.planet_name, p.type, count(*) as count
+           from cosmos.planets p
+           where p.type in ('TERRESTRIAL', 'GAS_GIANT', 'ICE_GIANT')
+             and p.status in ('OBSERVED', 'PENDING', 'HISTORICAL')
+           group by p.planet_name, p.type"
+   :transform "(fn [rows]
+                 (mapv (fn [{:keys [planet_name type count]}]
+                         {:name (str \"planets.\" planet_name \".\" type)
+                          :value count
+                          :labels {:planet planet_name
+                                   :planet_type type
+                                   :service \"planet-classification\"}})
+                       rows))"}
+
+  ;; moon metrics from solar system database
+
+  {:id "moon-metrics"
+   :source :solar-system-db
+   :schedule "5m"
+   :query "select host_planet,
+                  count(*) as total,
+                  avg(diameter_km) as avg_diameter,
+                  sum(mass_kg) as total_mass
+           from moons
+           where discovery_date > now() - interval '100 years'
+           group by host_planet"
+   :transform "(fn [rows]
+                 (mapcat (fn [{:keys [host_planet total avg_diameter total_mass]}]
+                           [{:name \"moons.count\"
+                             :value total
+                             :labels {:planet host_planet}}
+                            {:name \"moons.avg_diameter\"
+                             :value avg_diameter
+                             :labels {:planet host_planet}}
+                            {:name \"moons.total_mass\"
+                             :value total_mass
+                             :labels {:planet host_planet}}])
+                         rows))"}
+
+  ;; star activity metrics from galaxy database
+
+  {:id "star-activity"
+   :source :galaxy-db
+   :schedule "15m"
+   :query "select star_class, solar_system, count(distinct star_id) as active_stars
+           from stellar_activity
+           where activity_time > now() - interval '1 year'
+           group by star_class, solar_system"
+   :transform "(fn [rows]
+                 (mapv (fn [{:keys [star_class solar_system active_stars]}]
+                         {:name \"active_stars\"
+                          :value active_stars
+                          :labels {:class star_class
+                                   :system solar_system}})
+                       rows))"}
+
+  ;; telescope health check via API
+
+  {:id "telescope-health"
+   :source :telescope-api
+   :schedule "30s"
+   :path "/health"
+   :method "GET"
+   :transform "(fn [response]
+                 (let [status (:status response)
+                       body (:body response)
+                       healthy (= status 200)]
+                   [{:name \"telescope.healthy\"
+                     :value (if healthy 1 0)
+                     :labels {:service \"main-telescope\"}}
+                    {:name \"telescope.response_time\"
+                     :value (get-in body [:metrics :response_time] 0)
+                     :labels {:service \"main-telescope\"}}]))"}
+
+  ;; observatory system metrics via jmx
+
+  {:id "observatory-metrics"
+   :source :observatory-jmx
+   :schedule "1m"
+   :beans [["java.lang:type=Memory" "HeapMemoryUsage"]
+           ["java.lang:type=Threading" "ThreadCount"]
+           ["java.lang:type=OperatingSystem" "ProcessCpuLoad"]]
+   :transform "(fn [results]
+                 (map (fn [[bean attr value]]
+                        (let [bean-name (last (clojure.string/split bean #\"=\"))
+                              metric-name (str \"observatory.\"
+                                               (-> bean-name
+                                                   (clojure.string/lower-case)
+                                                   (clojure.string/replace #\"[^a-z0-9]\" \"_\"))
+                                               \".\"
+                                               (-> attr
+                                                   (clojure.string/lower-case)
+                                                   (clojure.string/replace #\"[^a-z0-9]\" \"_\")))]
+                          {:name metric-name
+                           :value (if (map? value)
+                                    (get value :used 0)
+                                    value)
+                           :labels {:service \"observatory1\"}}))
+                      results))"}]
+
+
+ :publishers
+  {:prometheus {:type :prometheus
+               :port 9090
+               :endpoint "/metrics"
+               :collectors ["planet-metrics"
+                            "moon-metrics"
+                            "star-activity"
+                            "telescope-health"
+                            "observatory-metrics"]}
+
+   :elastic {:type :elasticsearch
+             :url "https://elastic.example.com"
+             :auth-type :basic           ;; by default, but can also be :api-key or :token
+             :accrete false              ;; default is false, if true, will NOT delete all docs from the index before indexing
+             :username "elastic_user"
+             :password "elastic_password"
+             :index-prefix "astro"       ;; index name will be "<index-prefix>-collector-id"
+             :collectors [
+                          "planet-metrics"
+                          "star-activity"
+                          ]}
+
+   :stdout {:type :stdout
+            :pretty-print true
+            :collectors [
+                         "planet-metrics"
+                         "moon-metrics"
+                         "star-activity"
+                         "telescope-health"
+                         "observatory-metrics"]}
+  }
+
+ :scheduler
+ {:default-interval "5m"
+  :thread-pool-size 5}
+
+ :web
+ {:port 4242
+  :root-uri "/"} ;; just for show. it would be "/" be default
+
+ :logging
+ {:level :info
+  :appenders [{:type :console}
+              {:type :file
+               :filename "/var/log/baymax/baymax.log"
+               :rolling true}]}}
