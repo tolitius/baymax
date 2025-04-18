@@ -31,22 +31,27 @@
               intel (source/collect source collector)
               duration (- (System/currentTimeMillis) start-time)]
 
-          (log/info "collected intel for" collector-id
-                    "in" duration "ms")
+          (if (seq intel)
+            (do
+              (log/info "collected intel for" collector-id "in" duration "ms")
 
-          ;; record intel to registry
-          (registry/record-intel! collector-id intel)
+              ;; record intel to registry
+              (registry/record-intel! collector-id intel)
 
-          ;; publish intel to all associated publishers
-          (doseq [pub publishers]
-            (try
-              (log/info "publishing intel from" collector-id "to" (-> pub :config :type))
-              (log/info (publisher/publish pub
-                                            collector-id
-                                            intel))
+              ;; publish intel to all associated publishers
+              (doseq [pub publishers]
+                (try
+                  (log/info "publishing intel from" collector-id "to" (-> pub :config :type))
+                  (log/info (publisher/publish pub
+                                               collector-id
+                                               intel))
 
-              (catch Exception e
-                (log/error "could not publish intel for" collector-id "to" (-> pub :config :type) "due to" (.getMessage e))))))
+                  (catch Exception e
+                    (log/error "could not publish intel for" collector-id "to" (-> pub :config :type) "due to" (.getMessage e))))))
+
+            (log/info "no/empty intel collected for" collector-id
+                      "from source" source-id
+                      "(took" (str duration "ms to look)"))))
 
         (catch Exception e
           (log/error e "could not collect intel for" collector-id "from source" source-id))))))
