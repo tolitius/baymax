@@ -40,7 +40,7 @@ or run it as an uberjar without docker..
 
 ### uberjar
 
-override the [baymax config](https://github.com/tolitius/baymax/blob/master/dev/resources/sample-config.edn) with secrets / env jawns:
+override the [baymax config](https://github.com/tolitius/baymax/blob/master/dev/resources/simple-config.edn) with secrets / env jawns:
 
 ```bash
 export SOURCES__SOME_DB__CONNECTION__HOST=...
