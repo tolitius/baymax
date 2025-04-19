@@ -75,6 +75,7 @@ tree:
 test:
 	clojure -X:test :patterns '[".*test.*"]'
 
-## does not work with "-M"s ¯\_(ツ)_/¯
 repl:
-	clojure -A:dev -A:test -A:repl
+	# clojure -A:dev -A:test -A:repl
+	clojure -M:dev:test:repl
+
