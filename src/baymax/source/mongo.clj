@@ -138,6 +138,13 @@
       (doto (SSLContext/getInstance "TLS")
         (.init nil (.getTrustManagers factory) nil)))))
 
+(defn- url-auth-source
+  "the driver only reports an \"authSource\" as a part of a credential,
+   and a credential only exists when the url carries a user, which is exactly what is stripped above.
+   hence it is read from the url itself"
+  [url]
+  (second (re-find #"(?i)[?&]authSource=([^&]+)" url)))
+
 (defn- url-ca-file
   "\"tlsCAFile\" is a mongosh / libmongoc option: the java driver logs it as unsupported and moves on.
    since a url is usually copied from a mongosh command that works, it is picked up from there as well"
@@ -182,7 +189,9 @@
                                   (without-credentials url)
                                   url))
           auth-db (or auth-source                             ;; explicit wins
-                      (some-> (.getCredential cs) .getSource) ;; then whatever the url says
+                      (url-auth-source url)                   ;; then "?authSource=" from the url
+                      (some-> (.getCredential cs) .getSource) ;; then a url that kept its own credentials
+                      (not-empty (.getDatabase cs))           ;; then the url's own database (mongo does the same)
                       database
                       "admin")
           ca-file (or (not-empty (s/trim (str tls-ca-file)))  ;; blank is "no ca": it keeps a config

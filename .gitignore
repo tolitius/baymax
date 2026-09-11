@@ -24,3 +24,4 @@ dev/config.edn
 src/ui/node_modules/**
 resources/public/js/**
 .lsp/
+src/ui/package-lock.json

@@ -72,7 +72,7 @@ collect from mongo, print intel to stdout, expose it in prometheus format:
 
 ## license
 
-Copyright © 2025 tolitius
+Copyright © 2026 tolitius
 
 Distributed under the Eclipse Public License either version 1.0 or (at
 your option) any later version.
