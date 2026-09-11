@@ -1,0 +1,60 @@
+;; a starter config: collect from mongodb, print to stdout, expose in prometheus format
+;;
+;; every value that comes from the environment needs to be here as a placeholder:
+;; env vars can only override keys that already exist in this config
+
+{:sources
+ {:cosmos-mongo
+  {:type :mongo
+   ;; no credentials in the url: they live in :user / :password below
+   :connection {:url "mongodb://localhost:27017"   ;; SOURCES__COSMOS_MONGO__CONNECTION__URL
+                :user "astro_reader"               ;; SOURCES__COSMOS_MONGO__CONNECTION__USER
+                :password "OVERRIDE_ME"            ;; SOURCES__COSMOS_MONGO__CONNECTION__PASSWORD
+                :database "cosmos"                 ;; SOURCES__COSMOS_MONGO__CONNECTION__DATABASE
+                :auth-source "admin"}              ;; SOURCES__COSMOS_MONGO__CONNECTION__AUTH_SOURCE
+   :pool {:maximum-pool-size 5
+          :minimum-idle 1}
+   :trusted true}}
+
+ :collectors
+ [
+  ;; asteroids per belt: an aggregation pipeline turned into metrics
+
+  {:id "asteroid-metrics"
+   :source :cosmos-mongo
+   :schedule "1m"
+   :collection "asteroids"
+   :pipeline [{:$match {:status {:$in ["OBSERVED" "PENDING"]}}}
+              {:$group {:_id {:belt "$belt"}
+                        :total {:$sum 1}
+                        :avg_diameter {:$avg "$diameter_km"}}}
+              {:$sort {:total -1}}
+              {:$limit 50}]
+   :transform "(fn [rows]
+                 (mapcat (fn [{:keys [_id total avg_diameter]}]
+                           [{:name \"asteroids.count\"
+                             :value total
+                             :labels {:belt (:belt _id)}}
+                            {:name \"asteroids.avg_diameter\"
+                             :value avg_diameter
+                             :labels {:belt (:belt _id)}}])
+                         rows))"}]
+
+ :publishers
+ {:stdout {:type :stdout
+           :pretty-print true
+           :collectors ["asteroid-metrics"]}
+
+  ;; listing a collector here is what puts it into "/intel-all/prometheus"
+  ;; (metrics are served by baymax's own web port, see :web below)
+  :prometheus {:type :prometheus
+               :port 9090
+               :endpoint "/metrics"
+               :collectors ["asteroid-metrics"]}}
+
+ :scheduler
+ {:default-interval "1m"
+  :thread-pool-size 2}
+
+ :web
+ {:port 4242}}

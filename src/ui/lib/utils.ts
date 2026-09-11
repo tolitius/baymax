@@ -21,6 +21,12 @@ export function findSourceTypeIcon(type: string): { icon: string, color: string,
         color: 'text-indigo-500',
         label: 'PostgreSQL'
       };
+    case 'mongo':
+      return {
+        icon: 'fas fa-leaf',
+        color: 'text-green-500',
+        label: 'MongoDB'
+      };
     case 'http':
       return {
         icon: 'fas fa-globe',

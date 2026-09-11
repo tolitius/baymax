@@ -8,6 +8,7 @@
         seancorfield/next.jdbc {:mvn/version "1.2.659"}
         org.postgresql/postgresql {:mvn/version "42.7.5"}
         hikari-cp/hikari-cp {:mvn/version "3.2.0"}
+        org.mongodb/mongodb-driver-sync {:mvn/version "5.11.1"}
         clj-http/clj-http {:mvn/version "3.13.0"}
         metosin/jsonista {:mvn/version "0.3.13"}
         camel-snake-kebab/camel-snake-kebab {:mvn/version "0.4.3"}

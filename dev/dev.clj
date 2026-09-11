@@ -14,6 +14,7 @@
             [baymax.scheduler :as scheduler]
             [baymax.source.proto :as source]
             [baymax.source.postgres :as pg]
+            [baymax.source.mongo :as mongo]
             [baymax.publisher.proto :as publisher]
             [baymax.publisher.elastic :as elastic]
             ))

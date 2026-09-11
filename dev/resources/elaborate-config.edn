@@ -19,6 +19,17 @@
                 :password "OVERRIDE_ME"}
    :trusted true}
 
+  :cosmos-mongo
+  {:type :mongo
+   :connection {:url "mongodb+srv://cosmos.example.mongodb.net/?retryWrites=true&w=majority&tls=true&appName=baymax"
+                :user "astro_reader"                     ;; SOURCES__COSMOS_MONGO__CONNECTION__USER
+                :password "super-secret"                 ;; SOURCES__COSMOS_MONGO__CONNECTION__PASSWORD
+                :database "cosmos"                       ;; default database for this source's collectors
+                :auth-source "admin"}                    ;; optional: defaults to the url's authSource, then :database, then "admin"
+   :pool {:maximum-pool-size 10
+          :minimum-idle 2}
+   :trusted true}
+
   :telescope-api
   {:type :http
    :base-url "https://api.telescope.example.com"
@@ -94,6 +105,49 @@
                                    :system solar_system}})
                        rows))"}
 
+  ;; asteroid metrics from a mongo aggregation pipeline
+
+  {:id "asteroid-metrics"
+   :source :cosmos-mongo
+   :schedule "1m"
+   :collection "asteroids"
+   :pipeline [{:$match {:status {:$in ["OBSERVED" "PENDING"]}}}
+              {:$group {:_id {:belt "$belt"
+                              :composition "$composition"}
+                        :total {:$sum 1}
+                        :avg_diameter {:$avg "$diameter_km"}}}
+              {:$sort {:total -1}}
+              {:$limit 50}]
+   :transform "(fn [rows]
+                 (mapcat (fn [{:keys [_id total avg_diameter]}]
+                           [{:name \"asteroids.count\"
+                             :value total
+                             :labels {:belt (:belt _id)
+                                      :composition (:composition _id)}}
+                            {:name \"asteroids.avg_diameter\"
+                             :value avg_diameter
+                             :labels {:belt (:belt _id)
+                                      :composition (:composition _id)}}])
+                         rows))"}
+
+  ;; comet sightings from mongo (document-style: find + projection, identity transform)
+
+  {:id "comet-sightings"
+   :source :cosmos-mongo
+   :schedule "15m"
+   :database "cosmos"                        ;; optional, overrides the source's :connection :database
+   :collection "comet_sightings"
+   :find {:filter {:instrument "JWST"
+                   :confidence {:$gte 0.9}}
+          :projection {:_id 0
+                       :comet 1
+                       :observatory 1
+                       :magnitude 1
+                       :seen_at 1}
+          :sort {:seen_at -1}
+          :limit 100}
+   :transform "identity"}  ;; pass through the documents as-is
+
   ;; telescope health check via API
 
   {:id "telescope-health"
@@ -146,6 +200,7 @@
                :collectors ["planet-metrics"
                             "moon-metrics"
                             "star-activity"
+                            "asteroid-metrics"
                             "telescope-health"
                             "observatory-metrics"]}
 
@@ -159,6 +214,7 @@
              :collectors [
                           "planet-metrics"
                           "star-activity"
+                          "comet-sightings"
                           ]}
 
    :stdout {:type :stdout
@@ -167,6 +223,8 @@
                          "planet-metrics"
                          "moon-metrics"
                          "star-activity"
+                         "asteroid-metrics"
+                         "comet-sightings"
                          "telescope-health"
                          "observatory-metrics"]}
   }
