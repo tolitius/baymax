@@ -11,7 +11,10 @@
                 :user "astro_reader"               ;; SOURCES__COSMOS_MONGO__CONNECTION__USER
                 :password "OVERRIDE_ME"            ;; SOURCES__COSMOS_MONGO__CONNECTION__PASSWORD
                 :database "cosmos"                 ;; SOURCES__COSMOS_MONGO__CONNECTION__DATABASE
-                :auth-source "admin"}              ;; SOURCES__COSMOS_MONGO__CONNECTION__AUTH_SOURCE
+                :auth-source "admin"               ;; SOURCES__COSMOS_MONGO__CONNECTION__AUTH_SOURCE
+                :tls-ca-file ""}                   ;; SOURCES__COSMOS_MONGO__CONNECTION__TLS_CA_FILE
+                                                   ;; a private ca? point at its pem: the java driver
+                                                   ;; ignores a "tlsCAFile" in the url
    :pool {:maximum-pool-size 5
           :minimum-idle 1}
    :trusted true}}

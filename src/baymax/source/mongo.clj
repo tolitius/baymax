@@ -1,12 +1,16 @@
 (ns baymax.source.mongo
   (:require [clojure.tools.logging :as log]
             [clojure.string :as s]
+            [clojure.java.io :as io]
             [baymax.source.proto :refer [Source]])
   (:import [com.mongodb Block ConnectionString MongoClientSettings MongoCredential]
            [com.mongodb.client MongoClient MongoClients MongoCollection MongoDatabase]
            [org.bson Document]
            [org.bson.conversions Bson]
            [org.bson.types Decimal128 ObjectId]
+           [java.security KeyStore]
+           [java.security.cert CertificateFactory]
+           [javax.net.ssl SSLContext TrustManagerFactory]
            [java.util ArrayList Date List Map]))
 
 (defn- ->bson
@@ -108,6 +112,45 @@
         (:maximum-pool-size pool) (.maxSize (int (:maximum-pool-size pool)))
         (:minimum-idle pool)      (.minSize (int (:minimum-idle pool)))))))
 
+(defn- read-certificates [ca-file]
+  (let [file (io/file ca-file)]
+    (when-not (.exists file)
+      (throw (ex-info "mongo :tls-ca-file is not there" {:tls-ca-file ca-file})))
+    (with-open [in (io/input-stream file)]
+      (let [certs (.generateCertificates (CertificateFactory/getInstance "X.509") in)]
+        (when (empty? certs)
+          (throw (ex-info "mongo :tls-ca-file has no certificates in it" {:tls-ca-file ca-file})))
+        certs))))
+
+(defn- ca-ssl-context
+  "the mongo java driver does not read a \"tlsCAFile\": it trusts whatever the jvm trust store trusts.
+   to talk to a cluster that is behind a private ca, trust is built right here: from the pem itself.
+   it only applies to this source: the jvm trust store is left alone"
+  [ca-file]
+  (let [certs (read-certificates ca-file)
+        trust (doto (KeyStore/getInstance (KeyStore/getDefaultType))
+                (.load nil nil))]
+    (doseq [[idx cert] (map-indexed vector certs)]
+      (.setCertificateEntry trust (str "ca-" idx) cert))
+    (let [factory (doto (TrustManagerFactory/getInstance (TrustManagerFactory/getDefaultAlgorithm))
+                    (.init trust))]
+      (log/info "trusting" (count certs) "certificate(s) from" ca-file)
+      (doto (SSLContext/getInstance "TLS")
+        (.init nil (.getTrustManagers factory) nil)))))
+
+(defn- url-ca-file
+  "\"tlsCAFile\" is a mongosh / libmongoc option: the java driver logs it as unsupported and moves on.
+   since a url is usually copied from a mongosh command that works, it is picked up from there as well"
+  [url]
+  (second (re-find #"(?i)[?&]tlsCAFile=([^&]+)" url)))
+
+(defn- ssl-settings [^SSLContext ssl-context]
+  (reify Block
+    (apply [_ builder]
+      (doto builder
+        (.enabled true)       ;; a ca is only ever given for a tls connection
+        (.context ssl-context)))))
+
 (defn- user-without-password?
   "a url that brought a username, but no password: mongo won't even parse it"
   [url]
@@ -124,7 +167,7 @@
    cluster (srv) seed list, tls, replica set, read preference, timeouts, etc.
    hence it is taken as is, and credentials are kept separately: they tend to come from the environment"
   [{:keys [connection pool]}]
-  (let [{:keys [url user password database auth-source]} connection]
+  (let [{:keys [url user password database auth-source tls-ca-file]} connection]
 
     (when-not url
       (throw (ex-info "mongo source needs a :connection :url" {:connection (dissoc connection :password)})))
@@ -142,11 +185,18 @@
                       (some-> (.getCredential cs) .getSource) ;; then whatever the url says
                       database
                       "admin")
+          ca-file (or (not-empty (s/trim (str tls-ca-file)))  ;; blank is "no ca": it keeps a config
+                                                             ;; placeholder around for env vars to fill in
+                      (when-let [from-url (url-ca-file url)]
+                        (log/info "taking a tls ca file from the url:" from-url
+                                  "(set it as :connection :tls-ca-file to be explicit)")
+                        from-url))
           builder (-> (MongoClientSettings/builder)
                       (.applyConnectionString cs)
                       (.applyToConnectionPoolSettings (pool-settings pool)))]
       (MongoClients/create
         (.build (cond-> builder
+                  ca-file (.applyToSslSettings (ssl-settings (ca-ssl-context ca-file)))
                   user (.credential (MongoCredential/createCredential user
                                                                       auth-db
                                                                       ;; a config / env value is not always a string

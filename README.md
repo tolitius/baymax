@@ -114,6 +114,31 @@ SOURCES__COSMOS_MONGO__CONNECTION__AUTH_SOURCE=admin
 > _keep credentials out of the url: a mongo source takes them as `:user` / `:password`,
 > so the url is free to carry the interesting things: cluster (srv) seed list, tls, replica set, timeouts, etc._
 
+behind a private certificate authority? the mongo java driver does not read a `tlsCAFile` from the url
+(that one is a `mongosh` option), it trusts whatever the jvm trust store trusts, and an unknown ca ends in
+
+```
+javax.net.ssl.SSLHandshakeException: PKIX path building failed ... unable to find valid certification path
+```
+
+point the source at the pem instead, and mount it:
+
+```bash
+SOURCES__COSMOS_MONGO__CONNECTION__TLS_CA_FILE=/opt/app/baymax/root-ca.pem
+```
+
+```bash
+docker run -d --name baymax -p 4242:4242 \
+  --env-file baymax.env \
+  -v $PWD/root-ca.pem:/opt/app/baymax/root-ca.pem \
+  -v $PWD/mongo-config.edn:/opt/app/baymax/config.edn \
+  tolitius/baymax:latest
+```
+
+trust is then built from that pem for this source only: the jvm trust store is left alone.
+a `tlsCAFile` that is already in the url is picked up as well, since urls tend to come from a
+`mongosh` command that works
+
 a couple of things that are good to know:
 
 * an env var can only override a key that is **already** in the config file, so keep the placeholders
