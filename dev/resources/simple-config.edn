@@ -85,4 +85,7 @@
   :thread-pool-size 3}
 
  :web
- {:port 4242}}
+ {:port 4242}
+
+ :logging
+ {:metrics {:format :pretty}}}   ;; :pretty (default) or :json      LOGGING__METRICS__FORMAT

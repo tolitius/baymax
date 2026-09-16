@@ -13,8 +13,14 @@
 
         collectors (:collectors config)
 
+        ;; the global metrics log format travels with every publisher config
+        ;; a publisher level :format, if any, wins over it
+        metrics-format (env/metrics-format config)
+
         publishers (reduce-kv (fn [acc id pconfig]
-                                (assoc acc id (publisher/make-publisher pconfig)))
+                                (assoc acc id (publisher/make-publisher
+                                                (merge {:metrics-format metrics-format}
+                                                       pconfig))))
                               {}
                               (:publishers config))]
     {:sources sources

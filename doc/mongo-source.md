@@ -91,6 +91,25 @@ curl -s localhost:4242/intel/asteroid-metrics                      ## json
 curl -s localhost:4242/intel-all/prometheus                        ## prometheus
 ```
 
+pretty print is for human eyes, log shippers like json better: one object per metric, one per line
+
+```clojure
+:logging
+{:metrics {:format :json}}   ;; :pretty (default) or :json
+```
+
+```bash
+LOGGING__METRICS__FORMAT=json    ## .. or from the environment
+```
+
+```bash
+docker logs -f baymax | grep '^{' | jq .
+```
+
+```json
+{"collector":"asteroid-metrics","at":"2026-01-17 14:02:00","intel":{"name":"asteroids.count","value":3,"labels":{"belt":"main"}}}
+```
+
 ```
 # HELP asteroids_count Metric: asteroids_count
 # TYPE asteroids_count gauge

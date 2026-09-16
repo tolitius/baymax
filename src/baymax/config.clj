@@ -28,6 +28,28 @@
                            " expected format: <number><unit> (e.g. 5m, 30s)")
                       {:duration duration})))))
 
+(def metrics-formats #{:pretty :json})
+
+(defn parse-metrics-format
+  "normalize and validate a metrics log format, nil stays nil"
+  [format]
+  (when format
+    (let [format (if (string? format)     ;; cprop env override comes in as a string:
+                   (keyword format)       ;; LOGGING__METRICS__FORMAT=json
+                   format)]
+      (if (metrics-formats format)
+        format
+        (throw (ex-info (str "unknown metrics log format: " format)
+                        {:format format
+                         :supported-formats metrics-formats}))))))
+
+(defn metrics-format
+  "how metrics are logged: :pretty (default) or :json
+   comes from {:logging {:metrics {:format :json}}}"
+  [config]
+  (or (parse-metrics-format (get-in config [:logging :metrics :format]))
+      :pretty))
+
 ;; source and collector lookup functions
 
 (defn find-collector [config cid]
@@ -100,7 +122,8 @@
         validate-sources
         validate-publishers
         (assoc :collectors collectors)
-        (assoc :scheduler scheduler))))
+        (assoc :scheduler scheduler)
+        (assoc-in [:logging :metrics :format] (metrics-format config)))))
 
 (defn load-config
   "load and process the config"

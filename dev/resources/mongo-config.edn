@@ -46,6 +46,7 @@
  :publishers
  {:stdout {:type :stdout
            :pretty-print true
+           ;; :format :json      ;; this publisher only: overrides :logging => :metrics => :format
            :collectors ["asteroid-metrics"]}
 
   ;; listing a collector here is what puts it into "/intel-all/prometheus"
@@ -60,4 +61,8 @@
   :thread-pool-size 2}
 
  :web
- {:port 4242}}
+ {:port 4242}
+
+ ;; intel is pretty printed to stdout by default, ":json" makes it one json object per metric
+ :logging
+ {:metrics {:format :pretty}}}   ;; LOGGING__METRICS__FORMAT

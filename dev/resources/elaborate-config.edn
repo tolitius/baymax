@@ -219,6 +219,7 @@
 
    :stdout {:type :stdout
             :pretty-print true
+            ;; :format :json     ;; this publisher only: overrides :logging => :metrics => :format
             :collectors [
                          "planet-metrics"
                          "moon-metrics"
@@ -239,6 +240,7 @@
 
  :logging
  {:level :info
+  :metrics {:format :pretty}    ;; how collected intel is logged: :pretty (default) or :json
   :appenders [{:type :console}
               {:type :file
                :filename "/var/log/baymax/baymax.log"

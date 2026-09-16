@@ -1,14 +1,38 @@
 (ns baymax.publisher.stdout
   (:require [baymax.publisher.proto :refer [Publisher]]
+            [baymax.config :as env]
             [clojure.string :as s]
             [clojure.pprint :as pp]
+            [jsonista.core :as json]
             [clojure.tools.logging :as log]))
 
-(defn print-intel-atomically [collector-id intel at]
+(def mapper (json/object-mapper))
+
+(defn print-pretty
+  "a banner and a pretty printed intel: made for human eyes"
+  [collector-id intel at]
   (locking *out*
     (println "\n================= intel ==================== |" collector-id "|" at)
     (clojure.pprint/pprint intel)
     (println "============================================")))
+
+(defn print-json
+  "one json object per metric: made for log shippers
+   lines are built first, then emitted together, so a batch stays contiguous"
+  [collector-id intel at]
+  (let [lines (mapv #(json/write-value-as-string {:collector collector-id
+                                                  :at at
+                                                  :intel %}
+                                                 mapper)
+                    intel)]
+    (locking *out*
+      (doseq [line lines]
+        (println line)))))
+
+(defn print-intel-atomically [format collector-id intel at]
+  (case format
+    :json (print-json collector-id intel at)
+    (print-pretty collector-id intel at)))
 
 (defrecord StdoutPublisher [config]
   Publisher
@@ -17,7 +41,8 @@
           formatter (java.time.format.DateTimeFormatter/ofPattern "yyyy-MM-dd HH:mm:ss")
           formatted-time (.format timestamp formatter)]
 
-      (print-intel-atomically collector-id
+      (print-intel-atomically (:format config)
+                              collector-id
                               intel
                               formatted-time)
 
@@ -32,9 +57,16 @@
   (disconnect [this]
     {:status "disconnected"}))
 
-(defn make-publisher [config]
-  (let [conf (merge {:pretty-print true
+(defn make-publisher
+  "a publisher level :format wins over the one from {:logging {:metrics {:format ...}}}
+   which arrives here as :metrics-format. with neither around it is :pretty"
+  [config]
+  (let [format (or (env/parse-metrics-format (:format config))
+                   (:metrics-format config)
+                   :pretty)
+        conf (merge {:pretty-print true
                      :color false}
-                    config)]
-    (log/info "making stdout publisher")
+                    config
+                    {:format format})]
+    (log/info "making stdout publisher, logging metrics in" format "format")
     (->StdoutPublisher conf)))
