@@ -17,17 +17,14 @@
     (println "============================================")))
 
 (defn print-json
-  "one json object per metric: made for log shippers
-   lines are built first, then emitted together, so a batch stays contiguous"
+  "one json object per metric, logged as one event each: made for log shippers"
   [collector-id intel at]
-  (let [lines (mapv #(json/write-value-as-string {:collector collector-id
-                                                  :at at
-                                                  :intel %}
-                                                 mapper)
-                    intel)]
-    (locking *out*
-      (doseq [line lines]
-        (println line)))))
+  (doseq [metric intel]
+    (log/info "publishing intel:"
+              (json/write-value-as-string {:collector collector-id
+                                           :at at
+                                           :intel metric}
+                                          mapper))))
 
 (defn print-intel-atomically [format collector-id intel at]
   (case format

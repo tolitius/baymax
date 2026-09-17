@@ -102,12 +102,14 @@ pretty print is for human eyes, log shippers like json better: one object per me
 LOGGING__METRICS__FORMAT=json    ## .. or from the environment
 ```
 
-```bash
-docker logs -f baymax | grep '^{' | jq .
+each metric becomes its own log event, hence it carries the usual time / thread / level prefix
+
+```
+2026-01-17T14:02:00,659 [pool-2-thread-1] INFO  baymax.publisher.stdout - publishing intel: {"collector":"asteroid-metrics","at":"2026-01-17 14:02:00","intel":{"name":"asteroids.count","value":3,"labels":{"belt":"main"}}}
 ```
 
-```json
-{"collector":"asteroid-metrics","at":"2026-01-17 14:02:00","intel":{"name":"asteroids.count","value":3,"labels":{"belt":"main"}}}
+```bash
+docker logs -f baymax | grep -o '{"collector".*}' | jq .   ## .. the json out of it
 ```
 
 ```
